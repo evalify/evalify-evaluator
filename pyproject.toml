@@ -1,0 +1,9 @@
+[project]
+name = "evalify-evaluator"
+version = "0.1.0"
+description = "Evalify's Scalable Evaluation Backend"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.116.1",
+]
