@@ -8,7 +8,7 @@ from typing import AsyncGenerator, Optional
 
 import redis.asyncio as redis
 
-from .config import settings
+from .clients.redis_client import get_async_redis_client
 
 
 # Global Redis client instance
@@ -24,7 +24,7 @@ async def get_redis_client() -> AsyncGenerator[redis.Redis, None]:
     """
     global _redis_client
     if _redis_client is None:
-        _redis_client = redis.from_url(settings.redis_url, decode_responses=True)  # type: ignore
+        _redis_client = get_async_redis_client()
 
     try:
         yield _redis_client
