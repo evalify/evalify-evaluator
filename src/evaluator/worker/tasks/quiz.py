@@ -1,0 +1,57 @@
+"""Quiz Level Tasks for Evaluation"""
+
+from celery import group
+from celery.utils.log import get_task_logger
+
+from ...celery_app import app as current_app
+from ...core.schemas import EvaluationJobRequest
+from .student import student_job
+
+logger = get_task_logger(__name__)
+
+
+@current_app.task(bind=True, queue="desc-queue")
+def quiz_job(self, evaluation_id: str, request_dict: dict):
+    """
+    The main entry point for evaluating a full quiz.
+    It creates a group of student_job tasks.
+    """
+    request = EvaluationJobRequest.model_validate(request_dict)
+    logger.info(
+        f"Starting quiz evaluation for quiz_id={request.quiz_id} (evaluation_id={evaluation_id})"
+    )
+
+    try:
+        # Create one student_job for each student in the payload
+        sub_tasks = [
+            student_job.s(evaluation_id, student.model_dump())  # pyright: ignore[reportFunctionMemberAccess]
+            for student in request.students
+        ]
+
+        # This creates a 'group of groups'
+        # The result of this can be tracked to know when the entire quiz is done.
+        quiz_group_job = group(sub_tasks).delay()
+
+        if quiz_group_job is None:
+            raise RuntimeError(
+                "Failed to initialize student job group - got None result"
+            )
+        if not hasattr(quiz_group_job, "id") or quiz_group_job.id is None:
+            raise RuntimeError("Group was created but has no valid ID")
+
+        # grp.save()  # Save the group result; TODO: Check if this is necessary
+
+        logger.info(
+            f"Dispatched all student jobs for evaluation_id={evaluation_id}. Group ID: {quiz_group_job.id}"
+        )
+
+        # In a full system, you would save quiz_group_job.id to Redis against the evaluation_id
+        # to track the final completion.
+
+        return quiz_group_job.id
+    except Exception as e:
+        logger.error(
+            f"Failed to start quiz job for quiz_id={request.quiz_id}: {str(e)}",
+            exc_info=True,
+        )
+        raise  # Raise anyway :)

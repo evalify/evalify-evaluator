@@ -12,6 +12,16 @@ app: Celery = Celery("celery_app")
 # Load configuration
 app.config_from_object(celery_settings)
 
+# Auto-discover tasks
+app.autodiscover_tasks(
+    [
+        "celery_app.worker.tasks.question",
+        "celery_app.worker.tasks.student",
+        "celery_app.worker.tasks.quiz",
+    ],
+    force=True,
+)
+
 
 @app.task(bind=True)
 def debug_task(self: Task) -> str:
