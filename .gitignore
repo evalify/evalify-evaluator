@@ -15,3 +15,8 @@ wheels/
 
 # Secrets
 .env
+
+# Celery
+.celery/
+*.pid
+celerybeat-schedule*

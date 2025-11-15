@@ -15,9 +15,9 @@ app.config_from_object(celery_settings)
 # Auto-discover tasks
 app.autodiscover_tasks(
     [
-        "celery_app.worker.tasks.question",
-        "celery_app.worker.tasks.student",
-        "celery_app.worker.tasks.quiz",
+        "evaluator.worker.tasks.question",
+        "evaluator.worker.tasks.student",
+        "evaluator.worker.tasks.quiz",
     ],
     force=True,
 )
