@@ -18,12 +18,15 @@ class MCQEvaluator(BaseEvaluator):
         def to_normalized_list(value) -> list[str]:
             if value is None:
                 return []
-            # Accept list/tuple/set; otherwise wrap single value
+            # Accept list/tuple/set
             if isinstance(value, (list, tuple, set)):
                 seq = list(value)
+            # Wrap single string value in a list
+            elif isinstance(value, str):
+                seq = [value]
             else:
                 raise EvaluationFailedException(
-                    f"Invalid MCQ answer format of {value} {type(value)=}"
+                    f"Invalid MCQ answer format: expected list/string, got {type(value).__name__}"
                 )
 
             return seq
