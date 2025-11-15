@@ -151,6 +151,17 @@ class CelerySettings(BaseSettings):
     task_acks_late: bool = Field(default=True)
     worker_disable_rate_limits: bool = Field(default=True)
 
+    # Heartbeat and events settings
+    worker_heartbeat_interval: int = Field(
+        default=10, description="Heartbeat interval in seconds (higher = less frequent)"
+    )
+    worker_enable_heartbeat: bool = Field(
+        default=True, description="Enable worker heartbeat events"
+    )
+    worker_max_tasks_per_child: int = Field(
+        default=1000, description="Max tasks before worker process is recycled"
+    )
+
     # Logging
     worker_log_format: str = Field(
         default="[%(asctime)s: %(levelname)s/%(processName)s] %(message)s"

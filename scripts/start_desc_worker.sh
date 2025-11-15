@@ -30,5 +30,7 @@ celery -A evaluator.celery_app worker \
     --loglevel=info \
     --pool=gevent \
     --concurrency=100 \
+    --heartbeat-interval=2 \
+    -E \
     -Q desc-queue \
     -n desc-worker@%h

@@ -30,5 +30,7 @@ celery -A evaluator.celery_app worker \
     --loglevel=info \
     --pool=prefork \
     --concurrency=4 \
+    --heartbeat-interval=2 \
+    -E \
     -Q mcq-queue \
     -n mcq-worker@%h
