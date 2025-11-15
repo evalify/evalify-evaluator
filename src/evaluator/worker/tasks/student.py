@@ -3,7 +3,6 @@
 from ...celery_app import app as current_app
 from celery import group
 from celery.utils.log import get_task_logger
-import uuid
 
 from ...core.schemas import StudentPayload
 from ...config import settings
@@ -15,7 +14,7 @@ logger = get_task_logger(__name__)
 @current_app.task(
     bind=True, queue="desc-queue"
 )  # An I/O-bound queue is fine for orchestration
-def student_job(self, evaluation_id: str, student_payload_dict: dict):
+def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: dict):
     """
     Aggregates all question evaluations for a single student.
     Dynamically creates and routes question tasks to configured queues based on their type.
@@ -25,7 +24,7 @@ def student_job(self, evaluation_id: str, student_payload_dict: dict):
     student_payload = StudentPayload.model_validate(student_payload_dict)
     student_id = student_payload.student_id
     logger.info(
-        f"Starting evaluation for student_id={student_id} in evaluation_id={evaluation_id}"
+        f"Starting evaluation for student_id={student_id} in quiz_id={quiz_id} (evaluation_id={evaluation_id})"
     )
 
     sub_tasks = []
@@ -41,9 +40,8 @@ def student_job(self, evaluation_id: str, student_payload_dict: dict):
 
         # Step 2: Create the task payload for the generic question worker
         task_payload = {
-            "evaluation_id": evaluation_id,
-            "group_id": student_id,
-            "job_id": str(uuid.uuid4()),
+            "quiz_id": quiz_id,
+            "student_id": student_id,
             "question_data": question_data.model_dump(),
         }
 

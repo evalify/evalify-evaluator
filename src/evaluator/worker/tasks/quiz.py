@@ -24,7 +24,7 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
     try:
         # Create one student_job for each student in the payload
         sub_tasks = [
-            student_job.s(evaluation_id, student.model_dump())  # pyright: ignore[reportFunctionMemberAccess]
+            student_job.s(evaluation_id, request.quiz_id, student.model_dump())  # pyright: ignore[reportFunctionMemberAccess]
             for student in request.students
         ]
 
@@ -39,7 +39,8 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
         if not hasattr(quiz_group_job, "id") or quiz_group_job.id is None:
             raise RuntimeError("Group was created but has no valid ID")
 
-        # grp.save()  # Save the group result; TODO: Check if this is necessary
+        # Save the group result to the backend so it can be restored later
+        quiz_group_job.save()
 
         logger.info(
             f"Dispatched all student jobs for evaluation_id={evaluation_id}. Group ID: {quiz_group_job.id}"

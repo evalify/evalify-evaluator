@@ -1,5 +1,7 @@
 """Question Level Tasks for Evaluation"""
 
+import uuid
+
 from ...celery_app import app as current_app
 from celery.utils.log import get_task_logger
 
@@ -40,7 +42,7 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
         # Step 3: Package the successful result
         result_payload = QuestionEvaluationResult(
             quiz_id=task_payload.quiz_id,
-            job_id=self.request.job_id,
+            job_id=uuid.UUID(self.request.id),
             student_id=task_payload.student_id,
             question_id=task_payload.question_data.question_id,
             status="success",
@@ -56,7 +58,7 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
             quiz_id=task_payload.quiz_id,
             student_id=task_payload.student_id,
             question_id=task_payload.question_data.question_id,
-            job_id=self.request.job_id,
+            job_id=uuid.UUID(self.request.id),
             status="failed",
             evaluated_result=None,
         )
