@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .dependencies import close_redis_client
 from .version import __version__, get_version_info
+from .api.routers import evaluation_router
 
 
 @asynccontextmanager
@@ -44,6 +45,9 @@ if settings.allowed_origins or settings.environment == "development":
         if settings.allowed_headers != "*"
         else ["*"],
     )
+
+# Include API routers
+app.include_router(evaluation_router)
 
 
 @app.get("/api/v1/health")
