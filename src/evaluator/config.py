@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     question_type_to_queue: Dict[str, str] = {
         "MCQ": "mcq-queue",
         "FITB": "mcq-queue",
-        "MATCH": "mcq-queue",
+        "MATCHING": "mcq-queue",
+        "TRUE_FALSE": "mcq-queue",
         "DESCRIPTIVE": "desc-queue",
         "CODING": "coding-queue",
         "STUB_SLEEP": "desc-queue",
