@@ -36,6 +36,7 @@ class Settings(BaseSettings):
         "MATCH": "mcq-queue",
         "DESCRIPTIVE": "desc-queue",
         "CODING": "coding-queue",
+        "STUB_SLEEP": "desc-queue",
     }
 
     # ===== OPTIONAL SERVER SETTINGS =====

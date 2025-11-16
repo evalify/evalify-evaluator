@@ -5,9 +5,13 @@ from celery.utils.log import get_task_logger
 
 from ...celery_app import app as current_app
 from ...core.schemas import EvaluationJobRequest
+from ..utils.progress import EvaluationProgressStore
 from .student import student_job
 
 logger = get_task_logger(__name__)
+
+
+progress_store = EvaluationProgressStore(current_app)
 
 
 @current_app.task(bind=True, queue="desc-queue")
@@ -22,6 +26,7 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
     )
 
     try:
+        progress_store.mark_running(request.quiz_id)
         # Create one student_job for each student in the payload
         sub_tasks = [
             student_job.s(evaluation_id, request.quiz_id, student.model_dump())  # pyright: ignore[reportFunctionMemberAccess]
@@ -41,6 +46,7 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
 
         # Save the group result to the backend so it can be restored later
         quiz_group_job.save()
+        progress_store.attach_group(request.quiz_id, quiz_group_job.id)
 
         logger.info(
             f"Dispatched all student jobs for evaluation_id={evaluation_id}. Group ID: {quiz_group_job.id}"
@@ -55,4 +61,5 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
             f"Failed to start quiz job for quiz_id={request.quiz_id}: {str(e)}",
             exc_info=True,
         )
+        progress_store.mark_failed(request.quiz_id, reason=str(e))
         raise  # Raise anyway :)
