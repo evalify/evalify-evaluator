@@ -13,6 +13,23 @@ from .tasks import (
     StudentEvaluationResult,
     TaskPayload,
 )
+from .backend_api import (
+    QuestionType,
+    DifficultyLevel,
+    CourseOutcome,
+    BloomTaxonomyLevel,
+    SubmissionStatus,
+    EvaluationStatus,
+    Quiz,
+    QuizQuestion,
+    QuizDetailsResponse,
+    QuizQuestionsResponse,
+    QuizQuestionResponse,
+    QuizSettingsResponse,
+    QuizResponseRecord,
+    QuizStudentResponse,
+    QuizResponsesResponse,
+)
 
 __all__ = [
     "EvaluationJobRequest",
@@ -24,4 +41,19 @@ __all__ = [
     "QuestionEvaluationResult",
     "StudentEvaluationResult",
     "TaskPayload",
+    "QuestionType",
+    "DifficultyLevel",
+    "CourseOutcome",
+    "BloomTaxonomyLevel",
+    "SubmissionStatus",
+    "EvaluationStatus",
+    "Quiz",
+    "QuizQuestion",
+    "QuizDetailsResponse",
+    "QuizQuestionsResponse",
+    "QuizQuestionResponse",
+    "QuizSettingsResponse",
+    "QuizResponseRecord",
+    "QuizStudentResponse",
+    "QuizResponsesResponse",
 ]

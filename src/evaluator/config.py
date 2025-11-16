@@ -28,6 +28,16 @@ class Settings(BaseSettings):
         description="Base URL for the main Evalify backend API",
     )
 
+    evalify_url: str = Field(
+        default="http://localhost:3000",
+        description="Base URL for the Evalify Next.js application (used for /api/eval routes)",
+    )
+
+    evaluation_service_api_key: str = Field(
+        default="api_key",
+        description="API key required by the Evalify backend /api/eval endpoints",
+    )
+
     # ===== QUEUE MAPPING SETTINGS =====
     # TODO: Should I put this in CelerySettings, instead?
     question_type_to_queue: Dict[str, str] = {
