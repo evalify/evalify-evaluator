@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 
 class QuestionType(str, Enum):
@@ -16,32 +15,6 @@ class QuestionType(str, Enum):
     MATCHING = "MATCHING"
     FILE_UPLOAD = "FILE_UPLOAD"
     CODING = "CODING"
-
-
-class DifficultyLevel(str, Enum):
-    EASY = "EASY"
-    MEDIUM = "MEDIUM"
-    HARD = "HARD"
-
-
-class CourseOutcome(str, Enum):
-    CO1 = "CO1"
-    CO2 = "CO2"
-    CO3 = "CO3"
-    CO4 = "CO4"
-    CO5 = "CO5"
-    CO6 = "CO6"
-    CO7 = "CO7"
-    CO8 = "CO8"
-
-
-class BloomTaxonomyLevel(str, Enum):
-    REMEMBER = "REMEMBER"
-    UNDERSTAND = "UNDERSTAND"
-    APPLY = "APPLY"
-    ANALYZE = "ANALYZE"
-    EVALUATE = "EVALUATE"
-    CREATE = "CREATE"
 
 
 class SubmissionStatus(str, Enum):
@@ -240,49 +213,33 @@ QuestionSolution = Union[
 
 
 class QuizQuestion(BaseModel):
-    questionId: str
-    orderIndex: int
+    """Question schema for evaluation - only includes fields needed for grading.
+
+    Extra fields from the backend API are ignored to allow schema evolution
+    without breaking changes.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     type: QuestionType
     marks: float
     negativeMarks: float
-    difficulty: DifficultyLevel
-    courseOutcome: Optional[CourseOutcome] = None
-    bloomTaxonomyLevel: Optional[BloomTaxonomyLevel] = None
     question: str
     questionData: QuestionData
-    # NOTE: The backend API uses the misspelled field name 'explaination'.
-    # Use the correct spelling 'explanation' in code, and alias to 'explaination' for compatibility.
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation text from backend", alias="explaination"
-    )
     solution: Optional[QuestionSolution] = None
-    createdById: str
-    created_at: datetime
-    updated_at: datetime
 
 
 class Quiz(BaseModel):
+    """Minimal quiz schema - only the ID is needed for evaluation.
+
+    Extra fields from the backend API are ignored to allow schema evolution
+    without breaking changes.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
     id: str
-    name: str
-    description: Optional[str] = None
-    instructions: Optional[str] = None
-    startTime: datetime
-    endTime: datetime
-    duration: str
-    password: Optional[str] = None
-    fullScreen: bool
-    shuffleQuestions: bool
-    shuffleOptions: bool
-    linearQuiz: bool
-    calculator: bool
-    autoSubmit: bool
-    publishResult: bool
-    publishQuiz: bool
-    kioskMode: Optional[bool] = None
-    createdById: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
 
 
 class QuizDetailsResponse(BaseModel):
@@ -302,21 +259,20 @@ class QuizSettingsResponse(BaseModel):
 
 
 class QuizResponseRecord(BaseModel):
+    """Student quiz response schema - only fields needed for evaluation workflow.
+
+    Extra fields from the backend API are ignored to allow schema evolution
+    without breaking changes.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
     quizId: str
     studentId: str
-    startTime: datetime
-    endTime: Optional[datetime] = None
-    submissionTime: Optional[datetime] = None
-    ip: Optional[List[str]] = None
-    duration: str
-    response: Optional[Dict[str, Any]] = None
+    response: Optional[Dict[str, Any]] = None  # Student answers
     score: Optional[float] = None
-    violations: Optional[List[str]] = None
-    isViolated: bool
     submissionStatus: SubmissionStatus
     evaluationStatus: EvaluationStatus
-    created_at: datetime
-    updated_at: datetime
 
 
 class QuizStudentResponse(BaseModel):

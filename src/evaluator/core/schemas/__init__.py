@@ -15,9 +15,6 @@ from .tasks import (
 )
 from .backend_api import (
     QuestionType,
-    DifficultyLevel,
-    CourseOutcome,
-    BloomTaxonomyLevel,
     SubmissionStatus,
     EvaluationStatus,
     Quiz,
@@ -42,9 +39,6 @@ __all__ = [
     "StudentEvaluationResult",
     "TaskPayload",
     "QuestionType",
-    "DifficultyLevel",
-    "CourseOutcome",
-    "BloomTaxonomyLevel",
     "SubmissionStatus",
     "EvaluationStatus",
     "Quiz",
