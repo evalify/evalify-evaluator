@@ -8,3 +8,4 @@ import, we eagerly import the concrete evaluator modules here.
 # Eagerly import concrete evaluators so they register themselves
 # with the EvaluatorFactory upon package import.
 from . import mcq_evaluator  # noqa: F401  (imported for side effects)
+from . import stub_sleep_evaluator  # noqa: F401  (imported for side effects)
