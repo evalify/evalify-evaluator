@@ -16,12 +16,12 @@ class StubSleepEvaluator(BaseEvaluator):
     def evaluate(self, question_data: QuestionPayload) -> EvaluatorResult:
         """
         Simulates a slow grading pipeline and awards the question's full score.
-        
+
         Pauses execution for approximately 5 seconds to simulate processing delay, then returns an EvaluatorResult awarding full marks.
-        
+
         Parameters:
             question_data (QuestionPayload): The question payload; its `total_score` value will be awarded as the result score.
-        
+
         Returns:
             EvaluatorResult: Result with `score` equal to `question_data.total_score` and `feedback` set to "Stub evaluator awarded full marks after sleep".
         """

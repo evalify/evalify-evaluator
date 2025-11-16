@@ -28,10 +28,10 @@ logger = logging.getLogger(__name__)
 def _parse_datetime(value: Optional[object]) -> Optional[datetime]:
     """
     Convert a datetime-like value into a timezone-aware UTC datetime.
-    
+
     Parameters:
         value (Optional[object]): A datetime, a numeric Unix timestamp (int/float), an ISO8601 timestamp string, or None.
-    
+
     Returns:
         Optional[datetime]: A datetime with UTC tzinfo representing the same instant, or `None` if `value` is None or cannot be parsed.
     """
@@ -64,7 +64,7 @@ def _parse_datetime(value: Optional[object]) -> Optional[datetime]:
 def _iso(dt: datetime) -> str:
     """
     Convert a datetime to an ISO 8601 string in UTC.
-    
+
     Returns:
         An ISO 8601 formatted string representing `dt` converted to UTC.
     """
@@ -84,10 +84,10 @@ async def start_evaluation(
 ):
     """
     Start an evaluation job for a quiz and enqueue it for asynchronous processing.
-    
+
     Returns:
         EvaluationAcceptedResponse: Acceptance details containing `quiz_id`, `status`, and `progress_url`.
-    
+
     Raises:
         HTTPException: If the job cannot be queued.
     """
@@ -132,10 +132,10 @@ async def start_evaluation(
 async def get_evaluation_progress(quiz_id: str) -> EvaluationProgressResponse:
     """
     Return aggregated per-quiz evaluation progress derived from stored metadata and Celery task/group results.
-    
+
     Parameters:
         quiz_id (str): Identifier of the quiz whose evaluation progress to retrieve.
-    
+
     Returns:
         EvaluationProgressResponse: Progress snapshot including quiz_id, status (one of "QUEUED", "RUNNING", "COMPLETED", "FAILED"), students_finished, total_students, created_at (timezone-aware UTC datetime), and updated_at (timezone-aware UTC datetime).
     """

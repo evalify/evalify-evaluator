@@ -18,14 +18,14 @@ progress_store = EvaluationProgressStore(current_app)
 def quiz_job(self, evaluation_id: str, request_dict: dict):
     """
     Orchestrates per-student evaluation tasks for a quiz and dispatches them as a Celery group.
-    
+
     Parameters:
         evaluation_id (str): Identifier for this evaluation run.
         request_dict (dict): Serialized EvaluationJobRequest payload; will be validated and converted to an EvaluationJobRequest.
-    
+
     Returns:
         group_id (str): The Celery group result ID for the dispatched student jobs.
-    
+
     Raises:
         RuntimeError: If the student job group could not be initialized or the created group has no valid ID.
     """
