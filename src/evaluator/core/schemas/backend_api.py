@@ -254,8 +254,21 @@ class QuizQuestionResponse(BaseModel):
     data: QuizQuestion
 
 
+class QuizSettings(BaseModel):
+    id: str
+    mcqGlobalPartialMarking: bool
+    mcqGlobalNegativeMark: Optional[float] = None
+    mcqGlobalNegativePercent: Optional[float] = None
+    codingGlobalPartialMarking: bool
+    llmEvaluationEnabled: bool
+    llmProvider: Optional[str] = None
+    llmModelName: Optional[str] = None
+    fitbLlmSystemPrompt: Optional[str] = None
+    descLlmSystemPrompt: Optional[str] = None
+
+
 class QuizSettingsResponse(BaseModel):
-    message: str
+    settings: QuizSettings
 
 
 class QuizResponseRecord(BaseModel):

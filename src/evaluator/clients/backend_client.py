@@ -166,16 +166,14 @@ class BackendEvaluationAPIClient:
     def get_quiz_settings(self, quiz_id: str) -> QuizSettingsResponse:
         """Retrieve quiz settings/configuration.
 
-        Note: This endpoint is currently a placeholder and returns a generic message.
-
         Args:
             quiz_id: The unique identifier (UUID) of the quiz.
 
         Returns:
-            QuizSettingsResponse (currently contains only a placeholder message).
+            QuizSettingsResponse containing the quiz configuration.
 
         Raises:
-            BackendAPIError: If the request fails.
+            BackendAPIError: If the quiz settings are not found (404) or the request fails.
         """
         response = self._request("GET", f"/api/eval/quiz/{quiz_id}/settings")
         return QuizSettingsResponse.model_validate(response.json())
