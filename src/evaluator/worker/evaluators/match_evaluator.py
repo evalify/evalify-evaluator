@@ -1,5 +1,6 @@
 from .base import BaseEvaluator, EvaluatorResult, EvaluationFailedException
 from ...core.schemas import QuestionPayload
+from ...core.schemas.backend_api import MatchingSolution
 from typing import Dict, Set
 
 
@@ -11,13 +12,8 @@ class MatchEvaluator(BaseEvaluator):
     def evaluate(self, question_data: QuestionPayload) -> EvaluatorResult:
         """Evaluate Matching question by comparing match pairs.
 
-        Expected answer format: List[Dict] with keys 'id' and 'matchPairIds'
-        Example: [
-            {"id": "left-item-1", "matchPairIds": ["right-item-1", "right-item-2"]},
-            {"id": "left-item-2", "matchPairIds": ["right-item-3"]}
-        ]
-
-        Student answer format: Same as expected answer format
+        Expected answer format: MatchingSolution object/dict or List[Dict]
+        Student answer format: List[Dict] with keys 'id' and 'matchPairIds'
         """
 
         def normalize_matching_pairs(value) -> Dict[str, Set[str]]:
@@ -61,11 +57,28 @@ class MatchEvaluator(BaseEvaluator):
             return result
 
         if question_data.student_answer is None:
-            raise EvaluationFailedException("Student submission was empty.")
+            return EvaluatorResult(score=0.0, feedback="No answer provided")
 
         try:
             student_pairs = normalize_matching_pairs(question_data.student_answer)
-            expected_pairs = normalize_matching_pairs(question_data.expected_answer)
+
+            # Parse expected answer using strict schema
+            if isinstance(question_data.expected_answer, dict):
+                solution = MatchingSolution.model_validate(
+                    question_data.expected_answer
+                )
+                # Convert MatchingSolution to the list format normalize_matching_pairs expects
+                expected_list = [opt.model_dump() for opt in solution.options]
+                expected_pairs = normalize_matching_pairs(expected_list)
+            elif isinstance(question_data.expected_answer, MatchingSolution):
+                expected_list = [
+                    opt.model_dump() for opt in question_data.expected_answer.options
+                ]
+                expected_pairs = normalize_matching_pairs(expected_list)
+            else:
+                # Fallback for direct list format
+                expected_pairs = normalize_matching_pairs(question_data.expected_answer)
+
         except EvaluationFailedException:
             raise
         except Exception as e:

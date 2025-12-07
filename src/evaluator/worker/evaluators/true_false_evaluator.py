@@ -1,5 +1,6 @@
 from .base import BaseEvaluator, EvaluatorResult, EvaluationFailedException
 from ...core.schemas import QuestionPayload
+from ...core.schemas.backend_api import TrueFalseSolution
 
 
 class TrueFalseEvaluator(BaseEvaluator):
@@ -10,7 +11,7 @@ class TrueFalseEvaluator(BaseEvaluator):
     def evaluate(self, question_data: QuestionPayload) -> EvaluatorResult:
         """Evaluate True/False question by comparing boolean values.
 
-        Expected answer format: boolean (True/False)
+        Expected answer format: TrueFalseSolution object/dict or boolean
         Student answer format: boolean (True/False) or string ("true"/"false", case-insensitive)
         """
 
@@ -33,11 +34,23 @@ class TrueFalseEvaluator(BaseEvaluator):
             )
 
         if question_data.student_answer is None:
-            raise EvaluationFailedException("Student submission was empty.")
+            return EvaluatorResult(score=0.0, feedback="No answer provided")
 
         try:
             student_value = normalize_boolean(question_data.student_answer)
-            expected_value = normalize_boolean(question_data.expected_answer)
+
+            # Parse expected answer using strict schema
+            if isinstance(question_data.expected_answer, dict):
+                solution = TrueFalseSolution.model_validate(
+                    question_data.expected_answer
+                )
+                expected_value = solution.trueFalseAnswer
+            elif isinstance(question_data.expected_answer, TrueFalseSolution):
+                expected_value = question_data.expected_answer.trueFalseAnswer
+            else:
+                # Fallback for direct boolean
+                expected_value = normalize_boolean(question_data.expected_answer)
+
         except EvaluationFailedException:
             raise
         except Exception as e:

@@ -64,6 +64,19 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
         )
         return result_payload.model_dump()
 
+    except NotImplementedError as e:
+        # Step 5: Handle missing evaluators gracefully
+        logger.warning(f"Missing evaluator: {e}")
+        result_payload = QuestionEvaluationResult(
+            quiz_id=task_payload.quiz_id,
+            student_id=task_payload.student_id,
+            question_id=task_payload.question_data.question_id,
+            job_id=uuid.UUID(self.request.id),
+            status="not_implemented",
+            evaluated_result=None,
+        )
+        return result_payload.model_dump()
+
     except Exception:
         # Step 5: An unexpected system error occurred (e.g., Redis down, bug in code).
         # Re-raising the exception tells Celery this task FAILED and should be retried.
