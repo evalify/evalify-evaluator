@@ -23,13 +23,8 @@ class Settings(BaseSettings):
         description="Redis connection URL for job state and task queue",
     )
 
-    evalify_backend_url: str = Field(
-        default="http://localhost:8020",
-        description="Base URL for the main Evalify backend API",
-    )
-
     evalify_url: str = Field(
-        default="http://localhost:3000",
+        default="http://localhost:3000/api/utils/",
         description="Base URL for the Evalify Next.js application (used for /api/eval routes)",
     )
 

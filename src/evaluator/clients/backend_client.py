@@ -32,7 +32,7 @@ class BackendAPIError(RuntimeError):
 
 
 class BackendEvaluationAPIClient:
-    """Typed HTTP client for interacting with Evalify's /api/eval backend endpoints.
+    """Typed HTTP client for interacting with Evalify's /eval backend endpoints.
 
     This client manages an httpx.Client connection pool internally. To ensure proper
     resource cleanup, always use this client as a context manager:
@@ -124,7 +124,7 @@ class BackendEvaluationAPIClient:
             BackendAPIError: If the quiz is not found (404), the request fails,
                 or the backend returns an error response.
         """
-        response = self._request("GET", f"/api/eval/quiz/{quiz_id}")
+        response = self._request("GET", f"/eval/quiz/{quiz_id}")
         return QuizDetailsResponse.model_validate(response.json())
 
     def get_quiz_questions(self, quiz_id: str) -> QuizQuestionsResponse:
@@ -140,7 +140,7 @@ class BackendEvaluationAPIClient:
         Raises:
             BackendAPIError: If the quiz is not found or the request fails.
         """
-        response = self._request("GET", f"/api/eval/quiz/{quiz_id}/question")
+        response = self._request("GET", f"/eval/quiz/{quiz_id}/question")
         return QuizQuestionsResponse.model_validate(response.json())
 
     def get_quiz_question(self, quiz_id: str, question_id: str) -> QuizQuestionResponse:
@@ -159,7 +159,7 @@ class BackendEvaluationAPIClient:
                 or the request fails.
         """
         response = self._request(
-            "GET", f"/api/eval/quiz/{quiz_id}/question/{question_id}"
+            "GET", f"/eval/quiz/{quiz_id}/question/{question_id}"
         )
         return QuizQuestionResponse.model_validate(response.json())
 
@@ -175,7 +175,7 @@ class BackendEvaluationAPIClient:
         Raises:
             BackendAPIError: If the quiz settings are not found (404) or the request fails.
         """
-        response = self._request("GET", f"/api/eval/quiz/{quiz_id}/settings")
+        response = self._request("GET", f"/eval/quiz/{quiz_id}/settings")
         return QuizSettingsResponse.model_validate(response.json())
 
     def get_student_quiz_response(
@@ -196,7 +196,7 @@ class BackendEvaluationAPIClient:
                 or the request fails.
         """
         response = self._request(
-            "GET", f"/api/eval/quiz/{quiz_id}/student/{student_id}"
+            "GET", f"/eval/quiz/{quiz_id}/student/{student_id}"
         )
         return QuizStudentResponse.model_validate(response.json())
 
@@ -213,5 +213,5 @@ class BackendEvaluationAPIClient:
         Raises:
             BackendAPIError: If the quiz is not found or the request fails.
         """
-        response = self._request("GET", f"/api/eval/quiz/{quiz_id}/student")
+        response = self._request("GET", f"/eval/quiz/{quiz_id}/student")
         return QuizResponsesResponse.model_validate(response.json())
