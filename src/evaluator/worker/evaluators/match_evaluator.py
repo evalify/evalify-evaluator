@@ -1,7 +1,8 @@
 from .base import BaseEvaluator, EvaluatorResult, EvaluationFailedException
 from ...core.schemas import QuestionPayload
-from ...core.schemas.backend_api import MatchingSolution
+from ...core.schemas.backend_api import MatchingSolution, MatchStudentAnswer
 from typing import Dict, Set
+from pydantic import ValidationError
 
 
 class MatchEvaluator(BaseEvaluator):
@@ -60,7 +61,19 @@ class MatchEvaluator(BaseEvaluator):
             return EvaluatorResult(score=0.0, feedback="No answer provided")
 
         try:
-            student_pairs = normalize_matching_pairs(question_data.student_answer)
+            # Validate Student Answer Schema
+            try:
+                student_ans_obj = MatchStudentAnswer.model_validate(
+                    question_data.student_answer
+                )
+                # Convert Pydantic models to list of dicts for normalize_matching_pairs
+                raw_student_answer = [
+                    item.model_dump() for item in student_ans_obj.studentAnswer
+                ]
+            except ValidationError as e:
+                raise EvaluationFailedException(f"Invalid Student Answer Schema: {e}")
+
+            student_pairs = normalize_matching_pairs(raw_student_answer)
 
             # Parse expected answer using strict schema
             if isinstance(question_data.expected_answer, dict):

@@ -1,6 +1,7 @@
 from .base import BaseEvaluator, EvaluatorResult, EvaluationFailedException
 from ...core.schemas import QuestionPayload
-from ...core.schemas.backend_api import MCQSolution
+from ...core.schemas.backend_api import MCQSolution, MCQStudentAnswer
+from pydantic import ValidationError
 
 
 class MCQEvaluator(BaseEvaluator):
@@ -20,10 +21,6 @@ class MCQEvaluator(BaseEvaluator):
             if value is None:
                 return []
 
-            # Handle dict wrapper from backend (e.g. {'studentAnswer': 'id'})
-            if isinstance(value, dict) and "studentAnswer" in value:
-                value = value["studentAnswer"]
-
             # Accept list/tuple/set
             if isinstance(value, (list, tuple, set)):
                 seq = list(value)
@@ -40,7 +37,17 @@ class MCQEvaluator(BaseEvaluator):
 
             return [str(x).lower().strip() for x in seq]
 
-        student_items = to_normalized_list(question_data.student_answer)
+        # Validate Student Answer Schema
+        try:
+            student_ans_obj = MCQStudentAnswer.model_validate(
+                question_data.student_answer
+            )
+            raw_student_answer = student_ans_obj.studentAnswer
+
+        except ValidationError as e:
+            raise EvaluationFailedException(f"Invalid Student Answer Schema: {e}")
+
+        student_items = to_normalized_list(raw_student_answer)
 
         # Parse expected answer using strict schema
         try:

@@ -1,6 +1,7 @@
 from .base import BaseEvaluator, EvaluatorResult, EvaluationFailedException
 from ...core.schemas import QuestionPayload
-from ...core.schemas.backend_api import TrueFalseSolution
+from ...core.schemas.backend_api import TrueFalseSolution, TrueFalseStudentAnswer
+from pydantic import ValidationError
 
 
 class TrueFalseEvaluator(BaseEvaluator):
@@ -37,7 +38,16 @@ class TrueFalseEvaluator(BaseEvaluator):
             return EvaluatorResult(score=0.0, feedback="No answer provided")
 
         try:
-            student_value = normalize_boolean(question_data.student_answer)
+            # Validate Student Answer Schema
+            try:
+                student_ans_obj = TrueFalseStudentAnswer.model_validate(
+                    question_data.student_answer
+                )
+                raw_student_answer = student_ans_obj.studentAnswer
+            except ValidationError as e:
+                raise EvaluationFailedException(f"Invalid Student Answer Schema: {e}")
+
+            student_value = normalize_boolean(raw_student_answer)
 
             # Parse expected answer using strict schema
             if isinstance(question_data.expected_answer, dict):
