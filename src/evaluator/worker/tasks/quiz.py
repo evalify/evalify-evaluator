@@ -1,10 +1,17 @@
 """Quiz Level Tasks for Evaluation"""
 
+from typing import Any, List
 from celery import group
 from celery.utils.log import get_task_logger
 
 from ...celery_app import app as current_app
-from ...core.schemas import EvaluationJobRequest
+from ...core.schemas.api import EvaluationJobRequest
+from ...core.schemas.tasks import StudentPayload, QuestionPayload
+from ...core.schemas.backend_api import (
+    QuizQuestion,
+    QuizResponseRecord,
+)
+from ...clients.backend_client import BackendEvaluationAPIClient
 from ..utils.progress import EvaluationProgressStore
 from .student import student_job
 
@@ -12,6 +19,36 @@ logger = get_task_logger(__name__)
 
 
 progress_store = EvaluationProgressStore(current_app)
+
+
+def _map_response_to_student_payload(
+    student_response: QuizResponseRecord, questions: List[QuizQuestion]
+) -> StudentPayload:
+    """Maps a student's quiz response to a StudentPayload for evaluation."""
+    question_payloads = []
+    student_answers = student_response.response or {}
+
+    for question in questions:
+        student_ans = student_answers.get(question.id)
+
+        # TODO: Raise an error if expected answer is missing
+        expected_ans = question.solution.data if question.solution else None
+
+        # Create QuestionPayload
+        q_payload = QuestionPayload(
+            question_id=question.id,
+            question_type=question.type,
+            student_answer=student_ans,
+            expected_answer=expected_ans,
+            grading_guidelines=None,  # TODO: Extract if available in questionData
+            total_score=question.marks,
+        )
+        question_payloads.append(q_payload)
+
+    return StudentPayload(
+        student_id=student_response.studentId,
+        questions=question_payloads,
+    )
 
 
 @current_app.task(bind=True, queue="desc-queue")
@@ -36,11 +73,41 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
 
     try:
         progress_store.mark_running(request.quiz_id)
-        # Create one student_job for each student in the payload
-        sub_tasks = [
-            student_job.s(evaluation_id, request.quiz_id, student.model_dump())  # pyright: ignore[reportFunctionMemberAccess]
-            for student in request.students
-        ]
+
+        # Fetch questions and responses from backend
+        with BackendEvaluationAPIClient() as client:
+            logger.info(f"Fetching questions for quiz_id={request.quiz_id}")
+            questions_resp = client.get_quiz_questions(request.quiz_id)
+            questions = questions_resp.data
+
+            logger.info(f"Fetching student responses for quiz_id={request.quiz_id}")
+            responses_resp = client.get_quiz_responses(request.quiz_id)
+            student_responses = responses_resp.responses
+
+        # Update total students count in progress store
+        total_students = len(student_responses)
+        progress_store.update(request.quiz_id, total_students=total_students)
+        logger.info(
+            f"Found {total_students} students to evaluate for quiz_id={request.quiz_id}"
+        )
+
+        if total_students == 0:
+            logger.warning(f"No student responses found for quiz_id={request.quiz_id}")
+            progress_store.mark_completed(request.quiz_id)
+            return None
+
+        # Create one student_job for each student
+        sub_tasks = []
+        for response in student_responses:
+            # Map to StudentPayload
+            student_payload = _map_response_to_student_payload(response, questions)
+
+            # Create task signature
+            sub_tasks.append(
+                student_job.s(
+                    evaluation_id, request.quiz_id, student_payload.model_dump()
+                )  # pyright: ignore[reportFunctionMemberAccess]
+            )
 
         # This creates a 'group of groups'
         # The result of this can be tracked to know when the entire quiz is done.
