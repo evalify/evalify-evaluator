@@ -57,6 +57,7 @@ Queue mapping in `src/evaluator/config.py`: `question_type_to_queue` dict
 1. Create class in `src/evaluator/worker/evaluators/`, inherit `BaseEvaluator`
 2. Set `question_type = "YOUR_TYPE"` and implement `evaluate(question_data) → EvaluatorResult`
 3. Auto-registers; add queue mapping in config; ensure worker listens to that queue
+4. Update `docs/evaluators/README.md` to document the new/changed evaluator’s expected student/expected answer schemas
 
 ### 3. Task Hierarchy
 - `quiz_job` (entry point): Orchestrates all student evaluations, creates Celery group of `student_job` tasks
