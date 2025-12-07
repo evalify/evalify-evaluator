@@ -61,6 +61,7 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
             job_id=uuid.UUID(self.request.id),
             status="failed",
             evaluated_result=None,
+            error=str(e),
         )
         return result_payload.model_dump()
 
@@ -74,6 +75,7 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
             job_id=uuid.UUID(self.request.id),
             status="not_implemented",
             evaluated_result=None,
+            error=str(e),
         )
         return result_payload.model_dump()
 

@@ -69,6 +69,7 @@ class QuestionEvaluationResult(BaseModel):
     # Job stuff
     job_id: uuid.UUID
     status: str  # "success" or "failed"
+    error: Optional[str] = None
 
 
 class StudentEvaluationResult(BaseModel):
