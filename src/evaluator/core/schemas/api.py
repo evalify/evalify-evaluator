@@ -1,8 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import List
 from datetime import datetime
 
-from .tasks import StudentPayload
 
 # ==============================================================================
 # 1. API Request Models
@@ -21,10 +19,6 @@ class EvaluationJobRequest(BaseModel):
     override_evaluated: bool = Field(
         False,
         description="If true, forces re-evaluation of submissions that already have a grade.",
-    )
-    students: List[StudentPayload] = Field(
-        ...,
-        description="A list of all students and their corresponding submissions for the quiz.",
     )
 
     # TODO: Add Filters
