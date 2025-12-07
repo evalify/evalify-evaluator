@@ -190,6 +190,54 @@ class GenericSolution(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+# ==============================================================================
+# Student Answer Schemas
+# ==============================================================================
+
+
+class BaseStudentAnswer(BaseModel):
+    """Base wrapper for student answers if they always come wrapped."""
+
+    studentAnswer: Any
+
+
+class MCQStudentAnswer(BaseStudentAnswer):
+    studentAnswer: str  # The selected option ID
+
+
+class MMCQStudentAnswer(BaseStudentAnswer):
+    studentAnswer: List[str]  # List of selected option IDs
+
+
+class TrueFalseStudentAnswer(BaseStudentAnswer):
+    studentAnswer: Union[bool, str]  # "true"/"false" or True/False
+
+
+class MatchStudentAnswerItem(BaseModel):
+    id: str
+    matchPairIds: List[str]
+
+
+class MatchStudentAnswer(BaseStudentAnswer):
+    studentAnswer: List[MatchStudentAnswerItem]
+
+
+class DescriptiveStudentAnswer(BaseStudentAnswer):
+    studentAnswer: str
+
+
+class FillBlankStudentAnswer(BaseStudentAnswer):
+    studentAnswer: Dict[int, str]  # Map of blank index to answer text
+
+
+class CodingStudentAnswer(BaseStudentAnswer):
+    studentAnswer: str  # The code submitted
+
+
+class FileUploadStudentAnswer(BaseStudentAnswer):
+    studentAnswer: str  # The file URL or path
+
+
 T = TypeVar("T")
 
 
