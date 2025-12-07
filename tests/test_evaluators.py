@@ -8,6 +8,12 @@ import pytest
 
 from evaluator.worker.evaluators.factory import EvaluatorFactory
 from evaluator.core.schemas import QuestionPayload
+from evaluator.core.schemas.backend_api import (
+    MCQStudentAnswer,
+    TrueFalseStudentAnswer,
+    MatchStudentAnswer,
+    MatchStudentAnswerItem,
+)
 
 
 def _question(
@@ -45,18 +51,18 @@ def match_evaluator():
     return EvaluatorFactory.get_evaluator("MATCHING")
 
 
-def test_mcq_evaluator_accepts_unordered_answers(mcq_evaluator):
-    expected = ["opt-1", "opt-2"]
+def test_mcq_evaluator_accepts_single_string_answer(mcq_evaluator):
+    expected = ["opt-1"]
     question = _question(
         question_type="MCQ",
-        student_answer=["opt-2", "opt-1"],
+        student_answer=MCQStudentAnswer(studentAnswer="opt-1").model_dump(),
         expected_answer=expected,
-        total_score=2.0,
+        total_score=1.0,
     )
 
     result = mcq_evaluator.evaluate(question)
 
-    assert result.score == pytest.approx(2.0)
+    assert result.score == pytest.approx(1.0)
     assert result.feedback == "Correct"
 
 
@@ -64,7 +70,7 @@ def test_mcq_evaluator_flags_missing_options(mcq_evaluator):
     expected = ["opt-1", "opt-2"]
     question = _question(
         question_type="MCQ",
-        student_answer=["opt-1"],
+        student_answer=MCQStudentAnswer(studentAnswer="opt-1").model_dump(),
         expected_answer=expected,
         total_score=2.0,
     )
@@ -78,7 +84,7 @@ def test_mcq_evaluator_flags_missing_options(mcq_evaluator):
 def test_mcq_evaluator_accepts_string_answers(mcq_evaluator):
     question = _question(
         question_type="MCQ",
-        student_answer="opt-1",
+        student_answer=MCQStudentAnswer(studentAnswer="opt-1").model_dump(),
         expected_answer=["opt-1"],
         total_score=1.0,
     )
@@ -89,11 +95,23 @@ def test_mcq_evaluator_accepts_string_answers(mcq_evaluator):
     assert result.feedback == "Correct"
 
 
+def test_mcq_evaluator_rejects_invalid_schema(mcq_evaluator):
+    question = _question(
+        question_type="MCQ",
+        student_answer={"answer": "opt-1"},  # missing studentAnswer key
+        expected_answer=["opt-1"],
+        total_score=1.0,
+    )
+
+    with pytest.raises(Exception):
+        mcq_evaluator.evaluate(question)
+
+
 def test_true_false_evaluator_boolean_inputs(true_false_evaluator):
     question = _question(
         question_type="TRUE_FALSE",
-        student_answer=True,
-        expected_answer=True,
+        student_answer=TrueFalseStudentAnswer(studentAnswer=True).model_dump(),
+        expected_answer={"trueFalseAnswer": True},
     )
 
     result = true_false_evaluator.evaluate(question)
@@ -105,8 +123,8 @@ def test_true_false_evaluator_boolean_inputs(true_false_evaluator):
 def test_true_false_evaluator_incorrect_answer(true_false_evaluator):
     question = _question(
         question_type="TRUE_FALSE",
-        student_answer=False,
-        expected_answer=True,
+        student_answer=TrueFalseStudentAnswer(studentAnswer=False).model_dump(),
+        expected_answer={"trueFalseAnswer": True},
     )
 
     result = true_false_evaluator.evaluate(question)
@@ -118,13 +136,13 @@ def test_true_false_evaluator_incorrect_answer(true_false_evaluator):
 def test_true_false_evaluator_normalizes_strings(true_false_evaluator):
     question_true = _question(
         question_type="TRUE_FALSE",
-        student_answer="true",
-        expected_answer=True,
+        student_answer=TrueFalseStudentAnswer(studentAnswer="true").model_dump(),
+        expected_answer={"trueFalseAnswer": True},
     )
     question_false = _question(
         question_type="TRUE_FALSE",
-        student_answer="FALSE",
-        expected_answer=False,
+        student_answer=TrueFalseStudentAnswer(studentAnswer="FALSE").model_dump(),
+        expected_answer={"trueFalseAnswer": False},
     )
 
     assert true_false_evaluator.evaluate(question_true).score == pytest.approx(1.0)
@@ -158,7 +176,12 @@ def test_match_evaluator_accepts_correct_pairs(match_evaluator):
     expected = _matching_options()
     question = _question(
         question_type="MATCHING",
-        student_answer=deepcopy(expected),
+        student_answer=MatchStudentAnswer(
+            studentAnswer=[
+                MatchStudentAnswerItem.model_validate(item).model_dump()
+                for item in expected
+            ]
+        ).model_dump(),
         expected_answer=expected,
     )
 
@@ -175,7 +198,12 @@ def test_match_evaluator_detects_wrong_pairs(match_evaluator):
 
     question = _question(
         question_type="MATCHING",
-        student_answer=student_answer,
+        student_answer=MatchStudentAnswer(
+            studentAnswer=[
+                MatchStudentAnswerItem.model_validate(item).model_dump()
+                for item in student_answer
+            ]
+        ).model_dump(),
         expected_answer=expected,
     )
 
@@ -192,7 +220,12 @@ def test_match_evaluator_ignores_pair_order(match_evaluator):
 
     question = _question(
         question_type="MATCHING",
-        student_answer=student_answer,
+        student_answer=MatchStudentAnswer(
+            studentAnswer=[
+                MatchStudentAnswerItem.model_validate(item).model_dump()
+                for item in student_answer
+            ]
+        ).model_dump(),
         expected_answer=expected,
     )
 

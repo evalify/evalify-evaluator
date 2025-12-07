@@ -48,13 +48,19 @@ QUIZ_QUESTIONS_RESPONSE = {
             "bloomTaxonomyLevel": "UNDERSTAND",
             "question": "What is the capital of France?",
             "questionData": {
-                "options": [
-                    {"id": "opt1", "optionText": "Paris", "orderIndex": 1},
-                    {"id": "opt2", "optionText": "London", "orderIndex": 2},
-                ]
+                "data": {
+                    "options": [
+                        {"id": "opt1", "optionText": "Paris", "orderIndex": 1},
+                        {"id": "opt2", "optionText": "London", "orderIndex": 2},
+                    ]
+                },
+                "version": 1,
             },
             "explaination": "Paris is the capital city of France.",
-            "solution": {"correctOptions": [{"id": "opt1", "isCorrect": True}]},
+            "solution": {
+                "data": {"correctOptions": [{"id": "opt1", "isCorrect": True}]},
+                "version": 1,
+            },
             "createdById": "author-1",
             "created_at": "2025-02-01T09:00:00Z",
             "updated_at": "2025-02-10T09:15:00Z",
@@ -116,8 +122,8 @@ def create_mock_backend_client(route_map: MockHTTPTransport):
 
 def test_get_quiz_details_and_questions():
     route_map = MockHTTPTransport()
-    route_map.add("/api/eval/quiz/quiz-123", 200, QUIZ_RESPONSE)
-    route_map.add("/api/eval/quiz/quiz-123/question", 200, QUIZ_QUESTIONS_RESPONSE)
+    route_map.add("/eval/quiz/quiz-123", 200, QUIZ_RESPONSE)
+    route_map.add("/eval/quiz/quiz-123/question", 200, QUIZ_QUESTIONS_RESPONSE)
 
     with create_mock_backend_client(route_map) as client:
         details = client.get_quiz_details("quiz-123")
@@ -129,7 +135,7 @@ def test_get_quiz_details_and_questions():
         assert len(questions.data) == 1
         mcq = questions.data[0]
         assert mcq.question == "What is the capital of France?"
-        mcq_data = cast(MCQQuestionData, mcq.questionData)
+        mcq_data = cast(MCQQuestionData, mcq.questionData.data)
         assert mcq_data.options[0].optionText == "Paris"
         assert route_map.last_request is not None
         assert route_map.last_request.headers.get("API_KEY") == "test-key"
@@ -137,7 +143,7 @@ def test_get_quiz_details_and_questions():
 
 def test_get_student_response():
     route_map = MockHTTPTransport()
-    route_map.add("/api/eval/quiz/quiz-123/student/student-99", 200, STUDENT_RESPONSE)
+    route_map.add("/eval/quiz/quiz-123/student/student-99", 200, STUDENT_RESPONSE)
 
     with create_mock_backend_client(route_map) as client:
         response = client.get_student_quiz_response("quiz-123", "student-99")
@@ -149,7 +155,7 @@ def test_get_student_response():
 
 def test_error_response_raises_backend_api_error():
     route_map = MockHTTPTransport()
-    route_map.add("/api/eval/quiz/quiz-123", 500, {"error": "Failed", "status": 500})
+    route_map.add("/eval/quiz/quiz-123", 500, {"error": "Failed", "status": 500})
 
     with create_mock_backend_client(route_map) as client:
         with pytest.raises(BackendAPIError) as excinfo:
