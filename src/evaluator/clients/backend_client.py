@@ -215,3 +215,16 @@ class BackendEvaluationAPIClient:
         """
         response = self._request("GET", f"/eval/quiz/{quiz_id}/student")
         return QuizResponsesResponse.model_validate(response.json())
+
+
+if __name__ == "__main__":
+    from rich.console import Console
+    # Test an endpoint
+    client = BackendEvaluationAPIClient()
+    quiz_id = "843ba741-4f97-4b66-ba6a-28ccd94d59b2"
+    response = client.get_quiz_responses(quiz_id)
+
+
+    console = Console()
+    console.print(response)
+    console.print(f"Retrieved {len(response.data)} questions.")
