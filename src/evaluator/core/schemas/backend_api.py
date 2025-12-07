@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Literal, TypeVar, Generic
 
 from pydantic import BaseModel, ConfigDict
 
@@ -91,7 +91,7 @@ class BlankAcceptableAnswer(BaseModel):
 
 class FillBlankConfig(BaseModel):
     blankCount: int
-    acceptableAnswers: Dict[int, BlankAcceptableAnswer]
+    blankWeights: Optional[Dict[int, float]] = None
     evaluationType: BlankEvaluationType
 
 
@@ -190,44 +190,90 @@ class GenericSolution(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-QuestionData = Union[
-    MCQQuestionData,
-    TrueFalseQuestionData,
-    FillBlankQuestionData,
-    MatchingQuestionData,
-    DescriptiveQuestionData,
-    CodingQuestionData,
-    FileUploadQuestionData,
-    GenericQuestionData,
-]
-
-QuestionSolution = Union[
-    MCQSolution,
-    TrueFalseSolution,
-    FillBlankSolution,
-    MatchingSolution,
-    DescriptiveSolution,
-    CodingSolution,
-    GenericSolution,
-]
+T = TypeVar("T")
 
 
-class QuizQuestion(BaseModel):
-    """Question schema for evaluation - only includes fields needed for grading.
+class DataWrapper(BaseModel, Generic[T]):
+    data: T
+    version: int
 
-    Extra fields from the backend API are ignored to allow schema evolution
-    without breaking changes.
-    """
+
+class BaseQuizQuestion(BaseModel):
+    """Base schema for quiz questions."""
 
     model_config = ConfigDict(extra="ignore")
 
     id: str
-    type: QuestionType
     marks: float
     negativeMarks: float
     question: str
-    questionData: QuestionData
-    solution: Optional[QuestionSolution] = None
+
+
+class MCQQuizQuestion(BaseQuizQuestion):
+    type: Literal[QuestionType.MCQ]
+    questionData: DataWrapper[MCQQuestionData]
+    solution: Optional[DataWrapper[MCQSolution]] = None
+
+
+class MMCQQuizQuestion(BaseQuizQuestion):
+    type: Literal[QuestionType.MMCQ]
+    questionData: DataWrapper[MCQQuestionData]
+    solution: Optional[DataWrapper[MCQSolution]] = None
+
+
+class TrueFalseQuizQuestion(BaseQuizQuestion):
+    type: Literal[QuestionType.TRUE_FALSE]
+    questionData: DataWrapper[TrueFalseQuestionData]
+    solution: Optional[DataWrapper[TrueFalseSolution]] = None
+
+
+class DescriptiveQuizQuestion(BaseQuizQuestion):
+    type: Literal[QuestionType.DESCRIPTIVE]
+    questionData: DataWrapper[DescriptiveQuestionData]
+    solution: Optional[DataWrapper[DescriptiveSolution]] = None
+
+
+class FillBlankQuizQuestion(BaseQuizQuestion):
+    type: Literal[QuestionType.FILL_THE_BLANK]
+    questionData: DataWrapper[FillBlankQuestionData]
+    solution: Optional[DataWrapper[FillBlankSolution]] = None
+
+
+class MatchingQuizQuestion(BaseQuizQuestion):
+    type: Literal[QuestionType.MATCHING]
+    questionData: DataWrapper[MatchingQuestionData]
+    solution: Optional[DataWrapper[MatchingSolution]] = None
+
+
+class CodingQuizQuestion(BaseQuizQuestion):
+    type: Literal[QuestionType.CODING]
+    questionData: DataWrapper[CodingQuestionData]
+    solution: Optional[DataWrapper[CodingSolution]] = None
+
+
+class FileUploadQuizQuestion(BaseQuizQuestion):
+    type: Literal[QuestionType.FILE_UPLOAD]
+    questionData: DataWrapper[FileUploadQuestionData]
+    solution: Optional[DataWrapper[GenericSolution]] = None
+
+
+class FallbackQuizQuestion(BaseQuizQuestion):
+    type: QuestionType
+    questionData: DataWrapper[GenericQuestionData]
+    solution: Optional[DataWrapper[GenericSolution]] = None
+
+
+QuizQuestion = Union[
+    MCQQuizQuestion,
+    MMCQQuizQuestion,
+    TrueFalseQuizQuestion,
+    DescriptiveQuizQuestion,
+    FillBlankQuizQuestion,
+    MatchingQuizQuestion,
+    CodingQuizQuestion,
+    FileUploadQuizQuestion,
+    FallbackQuizQuestion,
+]
 
 
 class Quiz(BaseModel):
