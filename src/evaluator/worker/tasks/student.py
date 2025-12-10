@@ -6,6 +6,7 @@ from celery.utils.log import get_task_logger
 
 from ...core.schemas import StudentPayload
 from ...config import settings
+from ...clients.backend_client import BackendEvaluationAPIClient
 from .question import process_question_task
 
 logger = get_task_logger(__name__)
@@ -78,7 +79,29 @@ def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: di
                 r.result
             )  # r.result is the dict returned by process_question_task
 
-    # Step 6: This task's final return value is the aggregated payload
+    # Step 6: Persist student-level result via stub save endpoint (local file)
+    result_payload = {
+        "student_id": student_id,
+        "quiz_id": quiz_id,
+        "results": aggregated_results,
+    }
+
+    try:
+        with BackendEvaluationAPIClient() as client:
+            saved_path = client.save_student_result(
+                quiz_id=quiz_id,
+                student_id=student_id,
+                result=result_payload,
+            )
+        logger.info(
+            f"Saved student result for student_id={student_id}, quiz_id={quiz_id} at {saved_path}"
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to save student result for student_id={student_id}, quiz_id={quiz_id}"
+        )
+
+    # Step 7: Return the aggregated payload
     return {
         "student_id": student_id,
         "results": aggregated_results,
