@@ -46,6 +46,7 @@ __all__ = [
     "QuizDetailsResponse",
     "QuizQuestionsResponse",
     "QuizQuestionResponse",
+    "QuizSettings",
     "QuizSettingsResponse",
     "QuizResponseRecord",
     "QuizStudentResponse",

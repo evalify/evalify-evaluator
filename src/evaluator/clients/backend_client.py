@@ -13,7 +13,7 @@ from ..core.schemas.backend_api import (
     QuizQuestionResponse,
     QuizQuestionsResponse,
     QuizResponsesResponse,
-    QuizSettingsResponse,
+    QuizSettings,
     QuizStudentResponse,
 )
 
@@ -164,20 +164,20 @@ class BackendEvaluationAPIClient:
         response = self._request("GET", f"/eval/quiz/{quiz_id}/question/{question_id}")
         return QuizQuestionResponse.model_validate(response.json())
 
-    def get_quiz_settings(self, quiz_id: str) -> QuizSettingsResponse:
+    def get_quiz_settings(self, quiz_id: str) -> QuizSettings:
         """Retrieve quiz settings/configuration.
 
         Args:
             quiz_id: The unique identifier (UUID) of the quiz.
 
         Returns:
-            QuizSettingsResponse containing the quiz configuration.
+            QuizSettings containing the quiz configuration.
 
         Raises:
             BackendAPIError: If the quiz settings are not found (404) or the request fails.
         """
         response = self._request("GET", f"/eval/quiz/{quiz_id}/settings")
-        return QuizSettingsResponse.model_validate(response.json())
+        return QuizSettings.model_validate(response.json())
 
     def get_student_quiz_response(
         self, quiz_id: str, student_id: str
