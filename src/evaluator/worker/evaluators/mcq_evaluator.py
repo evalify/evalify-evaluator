@@ -82,11 +82,33 @@ class MCQEvaluator(BaseEvaluator):
 
         if not student_items:
             # Empty submission is not a failure, it's just incorrect (0 marks)
+            # (and typically no negative marks for blank submissions)
             return EvaluatorResult(score=0.0, feedback="No answer provided")
 
         is_correct = set(student_items) == set(expected_items)
 
+        if is_correct:
+            score = float(question_data.total_score)
+        else:
+            # Negative marking logic driven by quiz settings.
+            # Percent takes precedence over fixed mark.
+            neg_percent = context.quiz_settings.mcqGlobalNegativePercent
+            neg_mark = context.quiz_settings.mcqGlobalNegativeMark
+
+            if neg_percent is not None:
+                # Interpreting as fraction in [0, 1] (e.g., 0.25 => 25% of total marks)
+                if not (0.0 <= float(neg_percent) <= 1.0):
+                    raise EvaluationFailedException(
+                        "Invalid mcqGlobalNegativePercent: expected float in [0, 1], "
+                        f"got {neg_percent}"
+                    )
+                score = -float(question_data.total_score) * float(neg_percent)
+            elif neg_mark is not None:
+                score = -float(neg_mark)
+            else:
+                score = 0.0
+
         return EvaluatorResult(
-            score=question_data.total_score if is_correct else 0.0,
+            score=score,
             feedback="Correct" if is_correct else "Incorrect",
         )

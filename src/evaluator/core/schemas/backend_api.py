@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union, Literal, TypeVar, Generic
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class QuestionType(str, Enum):
@@ -351,8 +351,17 @@ class QuizQuestionResponse(BaseModel):
 class QuizSettings(BaseModel):
     id: str
     mcqGlobalPartialMarking: bool
-    mcqGlobalNegativeMark: Optional[float] = None
-    mcqGlobalNegativePercent: Optional[float] = None
+    mcqGlobalNegativeMark: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="Fixed negative marks deducted for incorrect MCQ answers.",
+    )
+    mcqGlobalNegativePercent: Optional[float] = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Negative marking fraction in [0, 1] for incorrect MCQ answers.",
+    )
     codingGlobalPartialMarking: bool
     llmEvaluationEnabled: bool
     llmProvider: Optional[str] = None

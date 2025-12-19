@@ -24,6 +24,7 @@ def _question(
     expected_answer,
     total_score: float = 1.0,
     question_id: str = "question",
+    quiz_settings: QuizSettings | None = None,
 ) -> QuestionPayload:
     """Helper to keep QuestionPayload construction consistent."""
 
@@ -34,7 +35,7 @@ def _question(
         expected_answer=expected_answer,
         grading_guidelines=None,
         total_score=total_score,
-        quiz_settings=_quiz_settings(),
+        quiz_settings=quiz_settings or _quiz_settings(),
     )
 
 
@@ -53,8 +54,8 @@ def _quiz_settings() -> QuizSettings:
     )
 
 
-def _context() -> EvaluatorContext:
-    return EvaluatorContext(quiz_settings=_quiz_settings())
+def _context(*, quiz_settings: QuizSettings | None = None) -> EvaluatorContext:
+    return EvaluatorContext(quiz_settings=quiz_settings or _quiz_settings())
 
 
 @pytest.fixture()
@@ -114,6 +115,56 @@ def test_mcq_evaluator_accepts_string_answers(mcq_evaluator):
 
     assert result.score == pytest.approx(1.0)
     assert result.feedback == "Correct"
+
+
+def test_mcq_evaluator_applies_negative_percent_precedence(mcq_evaluator):
+    settings = _quiz_settings().model_copy(
+        update={"mcqGlobalNegativePercent": 0.5, "mcqGlobalNegativeMark": 1.0}
+    )
+    question = _question(
+        question_type="MCQ",
+        student_answer=MCQStudentAnswer(studentAnswer="opt-2").model_dump(),
+        expected_answer=["opt-1"],
+        total_score=2.0,
+        quiz_settings=settings,
+    )
+
+    result = mcq_evaluator.evaluate(question, _context(quiz_settings=settings))
+
+    assert result.score == pytest.approx(-1.0)  # 50% of 2 marks
+    assert result.feedback == "Incorrect"
+
+
+def test_mcq_evaluator_rejects_negative_percent_out_of_range(mcq_evaluator):
+    settings = _quiz_settings().model_copy(update={"mcqGlobalNegativePercent": 1.5})
+    question = _question(
+        question_type="MCQ",
+        student_answer=MCQStudentAnswer(studentAnswer="opt-2").model_dump(),
+        expected_answer=["opt-1"],
+        total_score=2.0,
+        quiz_settings=settings,
+    )
+
+    with pytest.raises(Exception):
+        mcq_evaluator.evaluate(question, _context(quiz_settings=settings))
+
+
+def test_mcq_evaluator_applies_negative_mark_fallback(mcq_evaluator):
+    settings = _quiz_settings().model_copy(
+        update={"mcqGlobalNegativePercent": None, "mcqGlobalNegativeMark": 0.5}
+    )
+    question = _question(
+        question_type="MCQ",
+        student_answer=MCQStudentAnswer(studentAnswer="opt-2").model_dump(),
+        expected_answer=["opt-1"],
+        total_score=2.0,
+        quiz_settings=settings,
+    )
+
+    result = mcq_evaluator.evaluate(question, _context(quiz_settings=settings))
+
+    assert result.score == pytest.approx(-0.5)
+    assert result.feedback == "Incorrect"
 
 
 def test_mcq_evaluator_rejects_invalid_schema(mcq_evaluator):
