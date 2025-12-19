@@ -79,19 +79,44 @@ def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: di
                 r.result
             )  # r.result is the dict returned by process_question_task
 
-    # Step 6: Persist student-level result via stub save endpoint (local file)
-    result_payload = {
-        "student_id": student_id,
-        "quiz_id": quiz_id,
-        "results": aggregated_results,
+    # Build student-level save payload with required schema
+    data_map = {}
+    for res in aggregated_results:
+        question_id = res.get("question_id") if isinstance(res, dict) else None
+        if not question_id:
+            continue
+
+        status = res.get("status", "UNEVALUATED")
+        evaluated = res.get("evaluated_result") if isinstance(res, dict) else None
+        error_msg = res.get("error") if isinstance(res, dict) else None
+
+        if status == "success" and evaluated:
+            mark = evaluated.get("score", 0)
+            remarks = evaluated.get("feedback", "") or ""
+        else:
+            mark = 0
+            remarks = (
+                error_msg or (evaluated.get("feedback") if evaluated else "") or ""
+            )
+
+        data_map[question_id] = {
+            "status": status.upper() if isinstance(status, str) else "UNEVALUATED",
+            "mark": mark,
+            "remarks": remarks,
+        }
+
+    student_save_payload = {
+        "data": data_map,
+        "v": "v1",
     }
 
+    # Step 6: Persist student-level result via stub save endpoint (local file)
     try:
         with BackendEvaluationAPIClient() as client:
             saved_path = client.save_student_result(
                 quiz_id=quiz_id,
                 student_id=student_id,
-                result=result_payload,
+                result=student_save_payload,
             )
         logger.info(
             f"Saved student result for student_id={student_id}, quiz_id={quiz_id} at {saved_path}"
