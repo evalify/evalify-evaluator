@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ...core.schemas import QuestionPayload, EvaluatorResult
+from ...core.schemas import QuestionPayload, EvaluatorResult, EvaluatorContext
 
 
 class BaseEvaluator(ABC):
@@ -23,12 +23,15 @@ class BaseEvaluator(ABC):
         register_evaluator(cls.question_type, cls)
 
     @abstractmethod
-    def evaluate(self, question_data: QuestionPayload) -> EvaluatorResult:
+    def evaluate(
+        self, question_data: QuestionPayload, context: EvaluatorContext
+    ) -> EvaluatorResult:
         """
         Executes the evaluation logic for a given question payload.
 
         Args:
             question_data: The Pydantic model containing all necessary data.
+            context: Shared evaluation context (e.g., quiz-wide settings).
 
         Returns:
             An EvaluationResult object with the score and feedback.

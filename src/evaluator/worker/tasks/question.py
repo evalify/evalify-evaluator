@@ -5,7 +5,12 @@ import uuid
 from ...celery_app import app as current_app
 from celery.utils.log import get_task_logger
 
-from ...core.schemas import TaskPayload, QuestionEvaluationResult, EvaluatorResult
+from ...core.schemas import (
+    TaskPayload,
+    QuestionEvaluationResult,
+    EvaluatorResult,
+    EvaluatorContext,
+)
 from ..evaluators.factory import EvaluatorFactory
 from ..evaluators.base import EvaluationFailedException
 
@@ -37,7 +42,12 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
         )
 
         # Step 2: Execute the specific evaluation logic
-        result: EvaluatorResult = evaluator.evaluate(task_payload.question_data)
+        context = EvaluatorContext(
+            quiz_settings=task_payload.question_data.quiz_settings
+        )
+        result: EvaluatorResult = evaluator.evaluate(
+            task_payload.question_data, context
+        )
 
         # Step 3: Package the successful result
         result_payload = QuestionEvaluationResult(

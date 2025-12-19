@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 from .base import BaseEvaluator, EvaluatorResult
-from ...core.schemas import QuestionPayload
+from ...core.schemas import QuestionPayload, EvaluatorContext
 
 
 class StubSleepEvaluator(BaseEvaluator):
@@ -13,7 +13,9 @@ class StubSleepEvaluator(BaseEvaluator):
 
     question_type = "STUB_SLEEP"
 
-    def evaluate(self, question_data: QuestionPayload) -> EvaluatorResult:
+    def evaluate(
+        self, question_data: QuestionPayload, context: EvaluatorContext
+    ) -> EvaluatorResult:
         """
         Simulates a slow grading pipeline and awards the question's full score.
 

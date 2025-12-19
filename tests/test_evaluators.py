@@ -7,12 +7,13 @@ from copy import deepcopy
 import pytest
 
 from evaluator.worker.evaluators.factory import EvaluatorFactory
-from evaluator.core.schemas import QuestionPayload
+from evaluator.core.schemas import QuestionPayload, EvaluatorContext
 from evaluator.core.schemas.backend_api import (
     MCQStudentAnswer,
     TrueFalseStudentAnswer,
     MatchStudentAnswer,
     MatchStudentAnswerItem,
+    QuizSettings,
 )
 
 
@@ -33,7 +34,27 @@ def _question(
         expected_answer=expected_answer,
         grading_guidelines=None,
         total_score=total_score,
+        quiz_settings=_quiz_settings(),
     )
+
+
+def _quiz_settings() -> QuizSettings:
+    return QuizSettings(
+        id="quiz-1",
+        mcqGlobalPartialMarking=False,
+        mcqGlobalNegativeMark=None,
+        mcqGlobalNegativePercent=None,
+        codingGlobalPartialMarking=False,
+        llmEvaluationEnabled=False,
+        llmProvider=None,
+        llmModelName=None,
+        fitbLlmSystemPrompt=None,
+        descLlmSystemPrompt=None,
+    )
+
+
+def _context() -> EvaluatorContext:
+    return EvaluatorContext(quiz_settings=_quiz_settings())
 
 
 @pytest.fixture()
@@ -60,7 +81,7 @@ def test_mcq_evaluator_accepts_single_string_answer(mcq_evaluator):
         total_score=1.0,
     )
 
-    result = mcq_evaluator.evaluate(question)
+    result = mcq_evaluator.evaluate(question, _context())
 
     assert result.score == pytest.approx(1.0)
     assert result.feedback == "Correct"
@@ -75,7 +96,7 @@ def test_mcq_evaluator_flags_missing_options(mcq_evaluator):
         total_score=2.0,
     )
 
-    result = mcq_evaluator.evaluate(question)
+    result = mcq_evaluator.evaluate(question, _context())
 
     assert result.score == pytest.approx(0.0)
     assert result.feedback == "Incorrect"
@@ -89,7 +110,7 @@ def test_mcq_evaluator_accepts_string_answers(mcq_evaluator):
         total_score=1.0,
     )
 
-    result = mcq_evaluator.evaluate(question)
+    result = mcq_evaluator.evaluate(question, _context())
 
     assert result.score == pytest.approx(1.0)
     assert result.feedback == "Correct"
@@ -104,7 +125,7 @@ def test_mcq_evaluator_rejects_invalid_schema(mcq_evaluator):
     )
 
     with pytest.raises(Exception):
-        mcq_evaluator.evaluate(question)
+        mcq_evaluator.evaluate(question, _context())
 
 
 def test_true_false_evaluator_boolean_inputs(true_false_evaluator):
@@ -114,7 +135,7 @@ def test_true_false_evaluator_boolean_inputs(true_false_evaluator):
         expected_answer={"trueFalseAnswer": True},
     )
 
-    result = true_false_evaluator.evaluate(question)
+    result = true_false_evaluator.evaluate(question, _context())
 
     assert result.score == pytest.approx(1.0)
     assert result.feedback == "Correct"
@@ -127,7 +148,7 @@ def test_true_false_evaluator_incorrect_answer(true_false_evaluator):
         expected_answer={"trueFalseAnswer": True},
     )
 
-    result = true_false_evaluator.evaluate(question)
+    result = true_false_evaluator.evaluate(question, _context())
 
     assert result.score == pytest.approx(0.0)
     assert result.feedback == "Incorrect"
@@ -145,8 +166,12 @@ def test_true_false_evaluator_normalizes_strings(true_false_evaluator):
         expected_answer={"trueFalseAnswer": False},
     )
 
-    assert true_false_evaluator.evaluate(question_true).score == pytest.approx(1.0)
-    assert true_false_evaluator.evaluate(question_false).score == pytest.approx(1.0)
+    assert true_false_evaluator.evaluate(
+        question_true, _context()
+    ).score == pytest.approx(1.0)
+    assert true_false_evaluator.evaluate(
+        question_false, _context()
+    ).score == pytest.approx(1.0)
 
 
 def _matching_options():
@@ -185,7 +210,7 @@ def test_match_evaluator_accepts_correct_pairs(match_evaluator):
         expected_answer=expected,
     )
 
-    result = match_evaluator.evaluate(question)
+    result = match_evaluator.evaluate(question, _context())
 
     assert result.score == pytest.approx(1.0)
     assert result.feedback == "Correct"
@@ -207,7 +232,7 @@ def test_match_evaluator_detects_wrong_pairs(match_evaluator):
         expected_answer=expected,
     )
 
-    result = match_evaluator.evaluate(question)
+    result = match_evaluator.evaluate(question, _context())
 
     assert result.score == pytest.approx(0.0)
     assert result.feedback == "Incorrect"
@@ -229,7 +254,7 @@ def test_match_evaluator_ignores_pair_order(match_evaluator):
         expected_answer=expected,
     )
 
-    result = match_evaluator.evaluate(question)
+    result = match_evaluator.evaluate(question, _context())
 
     assert result.score == pytest.approx(1.0)
     assert result.feedback == "Correct"

@@ -1,5 +1,5 @@
 from .base import BaseEvaluator, EvaluatorResult, EvaluationFailedException
-from ...core.schemas import QuestionPayload
+from ...core.schemas import QuestionPayload, EvaluatorContext
 from ...core.schemas.backend_api import MCQSolution, MCQStudentAnswer
 from pydantic import ValidationError
 
@@ -9,7 +9,9 @@ class MCQEvaluator(BaseEvaluator):
 
     question_type = "MCQ"  # This is the registration key
 
-    def evaluate(self, question_data: QuestionPayload) -> EvaluatorResult:
+    def evaluate(
+        self, question_data: QuestionPayload, context: EvaluatorContext
+    ) -> EvaluatorResult:
         """Evaluate MCQ by treating both answers as lists and comparing sets.
 
         - Coerces student and expected answers into lists (if not already)

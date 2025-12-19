@@ -7,6 +7,7 @@ from celery.utils.log import get_task_logger
 from ...celery_app import app as current_app
 from ...core.schemas.api import EvaluationJobRequest
 from ...core.schemas.tasks import StudentPayload, QuestionPayload
+from ...core.schemas.backend_api import QuizSettings
 from ...core.schemas.backend_api import (
     QuizQuestion,
     QuizResponseRecord,
@@ -22,7 +23,9 @@ progress_store = EvaluationProgressStore(current_app)
 
 
 def _map_response_to_student_payload(
-    student_response: QuizResponseRecord, questions: List[QuizQuestion]
+    student_response: QuizResponseRecord,
+    questions: List[QuizQuestion],
+    quiz_settings: QuizSettings,
 ) -> StudentPayload:
     """Maps a student's quiz response to a StudentPayload for evaluation."""
     question_payloads = []
@@ -42,6 +45,7 @@ def _map_response_to_student_payload(
             expected_answer=expected_ans,
             grading_guidelines=None,  # TODO: Extract if available in questionData
             total_score=question.marks,
+            quiz_settings=quiz_settings,
         )
         question_payloads.append(q_payload)
 
@@ -80,6 +84,9 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
             questions_resp = client.get_quiz_questions(request.quiz_id)
             questions = questions_resp.data
 
+            logger.info(f"Fetching quiz settings for quiz_id={request.quiz_id}")
+            quiz_settings = client.get_quiz_settings(request.quiz_id)
+
             logger.info(f"Fetching student responses for quiz_id={request.quiz_id}")
             responses_resp = client.get_quiz_responses(request.quiz_id)
             student_responses = responses_resp.responses
@@ -100,7 +107,9 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
         sub_tasks = []
         for response in student_responses:
             # Map to StudentPayload
-            student_payload = _map_response_to_student_payload(response, questions)
+            student_payload = _map_response_to_student_payload(
+                response, questions, quiz_settings
+            )
 
             # Create task signature
             sub_tasks.append(

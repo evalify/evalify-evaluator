@@ -1,5 +1,5 @@
 from .base import BaseEvaluator, EvaluatorResult, EvaluationFailedException
-from ...core.schemas import QuestionPayload
+from ...core.schemas import QuestionPayload, EvaluatorContext
 from ...core.schemas.backend_api import MatchingSolution, MatchStudentAnswer
 from typing import Dict, Set
 from pydantic import ValidationError
@@ -10,7 +10,9 @@ class MatchEvaluator(BaseEvaluator):
 
     question_type = "MATCHING"  # This is the registration key
 
-    def evaluate(self, question_data: QuestionPayload) -> EvaluatorResult:
+    def evaluate(
+        self, question_data: QuestionPayload, context: EvaluatorContext
+    ) -> EvaluatorResult:
         """Evaluate Matching question by comparing match pairs.
 
         Expected answer format: MatchingSolution object/dict or List[Dict]

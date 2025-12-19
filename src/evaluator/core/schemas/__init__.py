@@ -12,6 +12,7 @@ from .tasks import (
     QuestionEvaluationResult,
     StudentEvaluationResult,
     TaskPayload,
+    EvaluatorContext,
 )
 from .backend_api import (
     QuestionType,
@@ -23,6 +24,7 @@ from .backend_api import (
     QuizQuestionsResponse,
     QuizQuestionResponse,
     QuizSettingsResponse,
+    QuizSettings,
     QuizResponseRecord,
     QuizStudentResponse,
     QuizResponsesResponse,
@@ -38,6 +40,7 @@ __all__ = [
     "QuestionEvaluationResult",
     "StudentEvaluationResult",
     "TaskPayload",
+    "EvaluatorContext",
     "QuestionType",
     "SubmissionStatus",
     "EvaluationStatus",

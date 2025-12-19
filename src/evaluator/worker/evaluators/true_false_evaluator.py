@@ -1,5 +1,5 @@
 from .base import BaseEvaluator, EvaluatorResult, EvaluationFailedException
-from ...core.schemas import QuestionPayload
+from ...core.schemas import QuestionPayload, EvaluatorContext
 from ...core.schemas.backend_api import TrueFalseSolution, TrueFalseStudentAnswer
 from pydantic import ValidationError
 
@@ -9,7 +9,9 @@ class TrueFalseEvaluator(BaseEvaluator):
 
     question_type = "TRUE_FALSE"  # This is the registration key
 
-    def evaluate(self, question_data: QuestionPayload) -> EvaluatorResult:
+    def evaluate(
+        self, question_data: QuestionPayload, context: EvaluatorContext
+    ) -> EvaluatorResult:
         """Evaluate True/False question by comparing boolean values.
 
         Expected answer format: TrueFalseSolution object/dict or boolean

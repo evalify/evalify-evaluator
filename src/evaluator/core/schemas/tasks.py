@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
+
+from .backend_api import QuizSettings
 import uuid
 
 # ==============================================================================
@@ -28,6 +30,9 @@ class QuestionPayload(BaseModel):
     )
     total_score: float = Field(
         ..., description="The maximum possible score for this question."
+    )
+    quiz_settings: QuizSettings = Field(
+        ..., description="Quiz-wide settings to be made available to evaluators."
     )
 
 
@@ -96,3 +101,13 @@ class TaskPayload(BaseModel):
     quiz_id: str  # For logging
     student_id: str  # The student_id
     question_data: QuestionPayload
+
+
+class EvaluatorContext(BaseModel):
+    """Context forwarded to evaluators.
+
+    Currently carries quiz-wide settings; can be extended with quiz_id/student_id
+    if richer logging or metrics are needed later.
+    """
+
+    quiz_settings: QuizSettings
