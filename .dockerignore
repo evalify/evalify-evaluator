@@ -1,0 +1,49 @@
+.git/
+.gitignore
+.github/
+.vscode/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+
+# Virtualenvs
+.venv/
+
+# Local / runtime artifacts
+.celery/
+tmp_results/
+build/
+dist/
+*.egg-info/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Secrets
+*.pem
+*.key
+*.p12
+*.crt
+
+# Test/coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
+
+# Typechecker/tool caches
+.mypy_cache/
+.pyright/
+.hypothesis/
+
+# Logs
+*.log
+
+# OS/editor cruft
+.DS_Store

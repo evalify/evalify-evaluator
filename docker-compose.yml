@@ -1,0 +1,122 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
+
+  api:
+    build: .
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app/src
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      EVALIFY_URL: ${EVALIFY_URL:-http://localhost:3000/api/utils/}
+      EVALUATION_SERVICE_API_KEY: ${EVALUATION_SERVICE_API_KEY:-api_key}
+      HOST: 0.0.0.0
+      PORT: 4040
+      # Celery defaults for any codepaths that read these in the API container
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    ports:
+      - "4040:4040"
+
+  worker-mcq:
+    build: .
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app/src
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      EVALIFY_URL: ${EVALIFY_URL:-http://localhost:3000/api/utils/}
+      EVALUATION_SERVICE_API_KEY: ${EVALUATION_SERVICE_API_KEY:-api_key}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    command:
+      [
+        "celery",
+        "-A",
+        "evaluator.celery_app",
+        "worker",
+        "--loglevel=info",
+        "--pool=prefork",
+        "--concurrency=4",
+        "--heartbeat-interval=2",
+        "-E",
+        "-Q",
+        "mcq-queue",
+        "-n",
+        "mcq-worker@%h"
+      ]
+
+  worker-desc:
+    build: .
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app/src
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      EVALIFY_URL: ${EVALIFY_URL:-http://localhost:3000/api/utils/}
+      EVALUATION_SERVICE_API_KEY: ${EVALUATION_SERVICE_API_KEY:-api_key}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    command:
+      [
+        "celery",
+        "-A",
+        "evaluator.celery_app",
+        "worker",
+        "--loglevel=info",
+        "--pool=gevent",
+        "--concurrency=100",
+        "--heartbeat-interval=2",
+        "-E",
+        "-Q",
+        "desc-queue",
+        "-n",
+        "desc-worker@%h"
+      ]
+
+  worker-coding:
+    build: .
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app/src
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      EVALIFY_URL: ${EVALIFY_URL:-http://localhost:3000/api/utils/}
+      EVALUATION_SERVICE_API_KEY: ${EVALUATION_SERVICE_API_KEY:-api_key}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    command:
+      [
+        "celery",
+        "-A",
+        "evaluator.celery_app",
+        "worker",
+        "--loglevel=info",
+        "--pool=prefork",
+        "--concurrency=2",
+        "--heartbeat-interval=2",
+        "-E",
+        "-Q",
+        "coding-queue",
+        "-n",
+        "coding-worker@%h"
+      ]
