@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "evalify-evaluator"
 version = "0.1.0"
@@ -19,3 +23,6 @@ dependencies = [
     "rich>=13.9.0",
     "uvicorn>=0.35.0",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/evaluator"]
