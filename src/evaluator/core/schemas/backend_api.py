@@ -219,7 +219,25 @@ class MatchStudentAnswerItem(BaseModel):
 
 
 class MatchStudentAnswer(BaseStudentAnswer):
-    studentAnswer: List[MatchStudentAnswerItem]
+    studentAnswer: Union[List[MatchStudentAnswerItem], Dict[str, List[str]]]
+
+    def to_list(self) -> List[Dict[str, List[str]]]:
+        """Normalize studentAnswer into a list-of-dicts structure.
+
+        Supports both list payloads (the original expected schema) and the
+        backend's dict-based payload (id -> matchPairIds[]).
+        """
+
+        if isinstance(self.studentAnswer, dict):
+            return [
+                {"id": key, "matchPairIds": value}
+                for key, value in self.studentAnswer.items()
+            ]
+
+        return [
+            item if isinstance(item, dict) else item.model_dump()
+            for item in self.studentAnswer
+        ]
 
 
 class DescriptiveStudentAnswer(BaseStudentAnswer):

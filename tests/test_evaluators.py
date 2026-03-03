@@ -309,3 +309,22 @@ def test_match_evaluator_ignores_pair_order(match_evaluator):
 
     assert result.score == pytest.approx(1.0)
     assert result.feedback == "Correct"
+
+
+def test_match_evaluator_accepts_dict_payload(match_evaluator):
+    expected = _matching_options()
+    # Backend may send matching answers as a dict: id -> matchPairIds
+    student_answer_dict = {item["id"]: item["matchPairIds"] for item in expected}
+
+    question = _question(
+        question_type="MATCHING",
+        student_answer=MatchStudentAnswer(
+            studentAnswer=student_answer_dict
+        ).model_dump(),
+        expected_answer=expected,
+    )
+
+    result = match_evaluator.evaluate(question, _context())
+
+    assert result.score == pytest.approx(1.0)
+    assert result.feedback == "Correct"

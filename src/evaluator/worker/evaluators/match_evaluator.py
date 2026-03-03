@@ -68,10 +68,8 @@ class MatchEvaluator(BaseEvaluator):
                 student_ans_obj = MatchStudentAnswer.model_validate(
                     question_data.student_answer
                 )
-                # Convert Pydantic models to list of dicts for normalize_matching_pairs
-                raw_student_answer = [
-                    item.model_dump() for item in student_ans_obj.studentAnswer
-                ]
+                # Normalize to list-of-dicts regardless of incoming shape
+                raw_student_answer = student_ans_obj.to_list()
             except ValidationError as e:
                 raise EvaluationFailedException(f"Invalid Student Answer Schema: {e}")
 
