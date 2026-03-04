@@ -33,7 +33,7 @@ pipeline {
             when {
                 anyOf {
                     branch 'release'
-                    branch 'main'
+                    branch 'master'
                 }
             }
             steps {
@@ -55,7 +55,7 @@ pipeline {
             when {
                 anyOf {
                     branch 'release'
-                    branch 'main'
+                    branch 'master'
                 }
             }
             steps {
