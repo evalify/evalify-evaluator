@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY . /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+    uv sync --locked --no-dev --no-editable
 
 
 # Runtime image: small, no uv included
@@ -30,6 +30,10 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH="/app/src" \
     PATH="/app/.venv/bin:$PATH"
+
+# Install curl for healthcheck and clean up apt cache
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
 
 # Run as a non-root user
 RUN groupadd --system --gid 999 nonroot \
@@ -43,6 +47,10 @@ COPY --from=builder --chown=nonroot:nonroot /app /app
 USER nonroot
 
 EXPOSE 4040
+
+# Health check for the API (worker services override CMD but can override this too)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:4040/api/v1/health || exit 1
 
 # Default to running the API; docker-compose overrides this for workers
 CMD ["uvicorn", "src.evaluator.main:app", "--host", "0.0.0.0", "--port", "4040"]
