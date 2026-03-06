@@ -100,9 +100,16 @@ def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: di
             )
 
         data_map[question_id] = {
-            "status": status.upper() if isinstance(status, str) else "UNEVALUATED",
-            "mark": mark,
+            "evaluation_status": status.upper()
+            if isinstance(status, str)
+            else "UNEVALUATED",
+            "question_type": res.get("question_type", "")
+            if isinstance(res, dict)
+            else "",
+            "score": mark,
             "remarks": remarks,
+            "metrics": res.get("metrics", {}) if isinstance(res, dict) else {},
+            "error_message": error_msg or None,
         }
 
     student_save_payload = {
@@ -110,16 +117,16 @@ def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: di
         "v": "v1",
     }
 
-    # Step 6: Persist student-level result via stub save endpoint (local file)
+    # Step 6: Persist student-level result via backend save endpoint
     try:
         with BackendEvaluationAPIClient() as client:
-            saved_path = client.save_student_result(
+            client.save_student_result(
                 quiz_id=quiz_id,
                 student_id=student_id,
                 result=student_save_payload,
             )
         logger.info(
-            f"Saved student result for student_id={student_id}, quiz_id={quiz_id} at {saved_path}"
+            f"Saved student result for student_id={student_id}, quiz_id={quiz_id}"
         )
     except Exception:
         logger.exception(

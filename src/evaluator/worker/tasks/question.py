@@ -1,5 +1,6 @@
 """Question Level Tasks for Evaluation"""
 
+import time
 import uuid
 
 from ...celery_app import app as current_app
@@ -8,6 +9,7 @@ from celery.utils.log import get_task_logger
 from ...core.schemas import (
     TaskPayload,
     QuestionEvaluationResult,
+    EvaluationMetrics,
     EvaluatorResult,
     EvaluatorContext,
 )
@@ -35,19 +37,21 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
     task_payload = TaskPayload.model_validate(task_payload_dict)
     logger.info(f"Processing student={task_payload.student_id}")
 
+    question_type = task_payload.question_data.question_type
+
     try:
         # Step 1: Get the correct evaluator instance from the factory
-        evaluator = EvaluatorFactory.get_evaluator(
-            task_payload.question_data.question_type
-        )
+        evaluator = EvaluatorFactory.get_evaluator(question_type)
 
         # Step 2: Execute the specific evaluation logic
         context = EvaluatorContext(
             quiz_settings=task_payload.question_data.quiz_settings
         )
+        _start = time.monotonic()
         result: EvaluatorResult = evaluator.evaluate(
             task_payload.question_data, context
         )
+        time_taken = time.monotonic() - _start
 
         # Step 3: Package the successful result
         result_payload = QuestionEvaluationResult(
@@ -55,8 +59,10 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
             job_id=uuid.UUID(self.request.id),
             student_id=task_payload.student_id,
             question_id=task_payload.question_data.question_id,
+            question_type=question_type,
             status="success",
             evaluated_result=result,
+            metrics=EvaluationMetrics(time_taken=time_taken),
         )
         return result_payload.model_dump()
 
@@ -68,6 +74,7 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
             quiz_id=task_payload.quiz_id,
             student_id=task_payload.student_id,
             question_id=task_payload.question_data.question_id,
+            question_type=question_type,
             job_id=uuid.UUID(self.request.id),
             status="failed",
             evaluated_result=None,
@@ -82,6 +89,7 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
             quiz_id=task_payload.quiz_id,
             student_id=task_payload.student_id,
             question_id=task_payload.question_data.question_id,
+            question_type=question_type,
             job_id=uuid.UUID(self.request.id),
             status="not_implemented",
             evaluated_result=None,

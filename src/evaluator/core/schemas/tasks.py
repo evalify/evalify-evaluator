@@ -59,12 +59,21 @@ class EvaluatorResult(BaseModel):
     feedback: Optional[str]
 
 
+class EvaluationMetrics(BaseModel):
+    """Timing and performance metrics captured during question evaluation."""
+
+    time_taken: float = Field(
+        ..., description="Wall-clock seconds spent inside the evaluator."
+    )
+
+
 class QuestionEvaluationResult(BaseModel):
     """
     Represents the evaluation result for a single question.
     """
 
     question_id: str
+    question_type: str
     evaluated_result: Optional[EvaluatorResult]
 
     # Redundant Stuff
@@ -75,6 +84,7 @@ class QuestionEvaluationResult(BaseModel):
     job_id: uuid.UUID
     status: str  # "success" or "failed"
     error: Optional[str] = None
+    metrics: Optional[EvaluationMetrics] = None
 
 
 class StudentEvaluationResult(BaseModel):
