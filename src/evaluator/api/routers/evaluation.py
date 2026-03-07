@@ -96,7 +96,7 @@ async def start_evaluation(
     progress_store.initialize(
         quiz_id=request.quiz_id,
         evaluation_task_id=evaluation_id,
-        total_students=len(request.students),
+        total_students=0,  # Will be updated in quiz_job after fetching students
     )
 
     try:
@@ -107,6 +107,8 @@ async def start_evaluation(
             "evaluator.worker.tasks.quiz.quiz_job",
             args=[evaluation_id, request.model_dump()],
             task_id=evaluation_id,
+            # TODO: Consider a separate queue for evaluation
+            # orchestration vs student evaluation tasks to better manage worker resources
             queue="desc-queue",
         )
 
