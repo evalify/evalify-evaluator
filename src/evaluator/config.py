@@ -37,7 +37,8 @@ class Settings(BaseSettings):
     # TODO: Should I put this in CelerySettings, instead?
     question_type_to_queue: Dict[str, str] = {
         "MCQ": "mcq-queue",
-        "FITB": "mcq-queue",
+        "MMCQ": "mcq-queue", # MCQs with multiple correct options
+        "FILL_THE_BLANK": "mcq-queue",
         "MATCHING": "mcq-queue",
         "TRUE_FALSE": "mcq-queue",
         "DESCRIPTIVE": "desc-queue",

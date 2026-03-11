@@ -10,6 +10,7 @@ from evaluator.worker.evaluators.factory import EvaluatorFactory
 from evaluator.core.schemas import QuestionPayload, EvaluatorContext
 from evaluator.core.schemas.backend_api import (
     MCQStudentAnswer,
+    MMCQStudentAnswer,
     TrueFalseStudentAnswer,
     MatchStudentAnswer,
     MatchStudentAnswerItem,
@@ -66,6 +67,11 @@ def mcq_evaluator():
 @pytest.fixture()
 def true_false_evaluator():
     return EvaluatorFactory.get_evaluator("TRUE_FALSE")
+
+
+@pytest.fixture()
+def mmcq_evaluator():
+    return EvaluatorFactory.get_evaluator("MMCQ")
 
 
 @pytest.fixture()
@@ -177,6 +183,80 @@ def test_mcq_evaluator_rejects_invalid_schema(mcq_evaluator):
 
     with pytest.raises(Exception):
         mcq_evaluator.evaluate(question, _context())
+
+
+def test_mmcq_evaluator_requires_exact_match_without_partial_marking(mmcq_evaluator):
+    question = _question(
+        question_type="MMCQ",
+        student_answer=MMCQStudentAnswer(studentAnswer=["opt-1", "opt-2"]).model_dump(),
+        expected_answer=["opt-1", "opt-2", "opt-3"],
+        total_score=3.0,
+    )
+
+    result = mmcq_evaluator.evaluate(question, _context())
+
+    assert result.score == pytest.approx(0.0)
+    assert result.feedback == "Incorrect"
+
+
+def test_mmcq_evaluator_supports_partial_marking_for_correct_subset(mmcq_evaluator):
+    settings = _quiz_settings().model_copy(update={"mcqGlobalPartialMarking": True})
+    question = _question(
+        question_type="MMCQ",
+        student_answer=MMCQStudentAnswer(studentAnswer=["opt-1", "opt-2"]).model_dump(),
+        expected_answer=["opt-1", "opt-2", "opt-3", "opt-4"],
+        total_score=8.0,
+        quiz_settings=settings,
+    )
+
+    result = mmcq_evaluator.evaluate(question, _context(quiz_settings=settings))
+
+    assert result.score == pytest.approx(4.0)
+    assert result.feedback == "Partially correct"
+
+
+def test_mmcq_evaluator_gives_full_marks_for_exact_match(mmcq_evaluator):
+    question = _question(
+        question_type="MMCQ",
+        student_answer=MMCQStudentAnswer(studentAnswer=["opt-1", "opt-2"]).model_dump(),
+        expected_answer=["opt-2", "opt-1"],
+        total_score=2.0,
+    )
+
+    result = mmcq_evaluator.evaluate(question, _context())
+
+    assert result.score == pytest.approx(2.0)
+    assert result.feedback == "Correct"
+
+
+def test_mmcq_evaluator_applies_negative_mark_when_wrong_option_selected(
+    mmcq_evaluator,
+):
+    settings = _quiz_settings().model_copy(update={"mcqGlobalNegativeMark": 0.5})
+    question = _question(
+        question_type="MMCQ",
+        student_answer=MMCQStudentAnswer(studentAnswer=["opt-1", "opt-4"]).model_dump(),
+        expected_answer=["opt-1", "opt-2", "opt-3"],
+        total_score=3.0,
+        quiz_settings=settings,
+    )
+
+    result = mmcq_evaluator.evaluate(question, _context(quiz_settings=settings))
+
+    assert result.score == pytest.approx(-0.5)
+    assert result.feedback == "Incorrect"
+
+
+def test_mmcq_evaluator_rejects_invalid_schema(mmcq_evaluator):
+    question = _question(
+        question_type="MMCQ",
+        student_answer={"studentAnswer": "opt-1"},
+        expected_answer=["opt-1", "opt-2"],
+        total_score=2.0,
+    )
+
+    with pytest.raises(Exception):
+        mmcq_evaluator.evaluate(question, _context())
 
 
 def test_true_false_evaluator_boolean_inputs(true_false_evaluator):
