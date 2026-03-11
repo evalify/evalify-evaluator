@@ -9,6 +9,13 @@ import pytest
 from evaluator.worker.evaluators.factory import EvaluatorFactory
 from evaluator.core.schemas import QuestionPayload, EvaluatorContext
 from evaluator.core.schemas.backend_api import (
+    BlankAcceptableAnswer,
+    BlankAnswerType,
+    BlankEvaluationType,
+    FillBlankConfig,
+    FillBlankQuestionData,
+    FillBlankSolution,
+    FillBlankStudentAnswer,
     MCQStudentAnswer,
     MMCQStudentAnswer,
     TrueFalseStudentAnswer,
@@ -23,6 +30,7 @@ def _question(
     question_type: str,
     student_answer,
     expected_answer,
+    question_data=None,
     total_score: float = 1.0,
     question_id: str = "question",
     quiz_settings: QuizSettings | None = None,
@@ -34,6 +42,7 @@ def _question(
         question_type=question_type,
         student_answer=student_answer,
         expected_answer=expected_answer,
+        question_data=question_data,
         grading_guidelines=None,
         total_score=total_score,
         quiz_settings=quiz_settings or _quiz_settings(),
@@ -77,6 +86,38 @@ def mmcq_evaluator():
 @pytest.fixture()
 def match_evaluator():
     return EvaluatorFactory.get_evaluator("MATCHING")
+
+
+@pytest.fixture()
+def fitb_evaluator():
+    return EvaluatorFactory.get_evaluator("FILL_THE_BLANK")
+
+
+def _fitb_question_data(
+    *,
+    blank_count: int,
+    evaluation_type: BlankEvaluationType,
+    blank_weights: dict[int, float] | None = None,
+) -> FillBlankQuestionData:
+    return FillBlankQuestionData(
+        config=FillBlankConfig(
+            blankCount=blank_count,
+            blankWeights=blank_weights,
+            evaluationType=evaluation_type,
+        )
+    )
+
+
+def _fitb_solution(acceptable_answers: dict[int, list[str]]) -> FillBlankSolution:
+    return FillBlankSolution(
+        acceptableAnswers={
+            blank_index: BlankAcceptableAnswer(
+                answers=answers,
+                type=BlankAnswerType.TEXT,
+            )
+            for blank_index, answers in acceptable_answers.items()
+        }
+    )
 
 
 def test_mcq_evaluator_accepts_single_string_answer(mcq_evaluator):
@@ -257,6 +298,148 @@ def test_mmcq_evaluator_rejects_invalid_schema(mmcq_evaluator):
 
     with pytest.raises(Exception):
         mmcq_evaluator.evaluate(question, _context())
+
+
+def test_fitb_evaluator_strict_mode_is_case_sensitive(fitb_evaluator):
+    question = _question(
+        question_type="FILL_THE_BLANK",
+        student_answer=FillBlankStudentAnswer(
+            studentAnswer={0: "Wrapper"}
+        ).model_dump(),
+        expected_answer=_fitb_solution({0: ["wrapper"]}).model_dump(),
+        question_data=_fitb_question_data(
+            blank_count=1,
+            evaluation_type=BlankEvaluationType.STRICT,
+            blank_weights={0: 1.0},
+        ).model_dump(),
+        total_score=1.0,
+    )
+
+    result = fitb_evaluator.evaluate(question, _context())
+
+    assert result.score == pytest.approx(0.0)
+    assert result.feedback == "Incorrect"
+
+
+def test_fitb_evaluator_strict_mode_strips_whitespace(fitb_evaluator):
+    question = _question(
+        question_type="FILL_THE_BLANK",
+        student_answer=FillBlankStudentAnswer(studentAnswer={0: "wraps "}).model_dump(),
+        expected_answer=_fitb_solution({0: ["wraps"]}).model_dump(),
+        question_data=_fitb_question_data(
+            blank_count=1,
+            evaluation_type=BlankEvaluationType.STRICT,
+            blank_weights={0: 2.0},
+        ).model_dump(),
+        total_score=2.0,
+    )
+
+    result = fitb_evaluator.evaluate(question, _context())
+
+    assert result.score == pytest.approx(2.0)
+    assert result.feedback == "Correct"
+
+
+def test_fitb_evaluator_normal_mode_is_case_insensitive(fitb_evaluator):
+    question = _question(
+        question_type="FILL_THE_BLANK",
+        student_answer=FillBlankStudentAnswer(
+            studentAnswer={0: "Wrapper"}
+        ).model_dump(),
+        expected_answer=_fitb_solution({0: ["wrapper"]}).model_dump(),
+        question_data=_fitb_question_data(
+            blank_count=1,
+            evaluation_type=BlankEvaluationType.NORMAL,
+            blank_weights={0: 1.0},
+        ).model_dump(),
+        total_score=1.0,
+    )
+
+    result = fitb_evaluator.evaluate(question, _context())
+
+    assert result.score == pytest.approx(1.0)
+    assert result.feedback == "Correct"
+
+
+def test_fitb_evaluator_uses_configured_blank_weights_for_partial_marking(
+    fitb_evaluator,
+):
+    question = _question(
+        question_type="FILL_THE_BLANK",
+        student_answer=FillBlankStudentAnswer(
+            studentAnswer={0: "typing", 1: "Function", 2: "nope"}
+        ).model_dump(),
+        expected_answer=_fitb_solution(
+            {0: ["typing"], 1: ["function"], 2: ["5"], 3: ["Wrapper"]}
+        ).model_dump(),
+        question_data=_fitb_question_data(
+            blank_count=4,
+            evaluation_type=BlankEvaluationType.NORMAL,
+            blank_weights={0: 0.5, 1: 0.25, 2: 0.15, 3: 0.1},
+        ).model_dump(),
+        total_score=1.0,
+    )
+
+    result = fitb_evaluator.evaluate(question, _context())
+
+    assert result.score == pytest.approx(0.75)
+    assert result.feedback == "Partially correct"
+
+
+def test_fitb_evaluator_falls_back_to_equal_weights_when_missing(fitb_evaluator):
+    question = _question(
+        question_type="FILL_THE_BLANK",
+        student_answer=FillBlankStudentAnswer(
+            studentAnswer={0: "typing", 1: "function"}
+        ).model_dump(),
+        expected_answer=_fitb_solution(
+            {0: ["typing"], 1: ["function"], 2: ["5"], 3: ["wrapper"]}
+        ).model_dump(),
+        question_data=_fitb_question_data(
+            blank_count=4,
+            evaluation_type=BlankEvaluationType.NORMAL,
+        ).model_dump(),
+        total_score=2.0,
+    )
+
+    result = fitb_evaluator.evaluate(question, _context())
+
+    assert result.score == pytest.approx(1.0)
+    assert result.feedback == "Partially correct"
+
+
+def test_fitb_evaluator_rejects_hybrid_mode_for_now(fitb_evaluator):
+    question = _question(
+        question_type="FILL_THE_BLANK",
+        student_answer=FillBlankStudentAnswer(studentAnswer={0: "typing"}).model_dump(),
+        expected_answer=_fitb_solution({0: ["typing"]}).model_dump(),
+        question_data=_fitb_question_data(
+            blank_count=1,
+            evaluation_type=BlankEvaluationType.HYBRID,
+            blank_weights={0: 1.0},
+        ).model_dump(),
+        total_score=1.0,
+    )
+
+    with pytest.raises(Exception):
+        fitb_evaluator.evaluate(question, _context())
+
+
+def test_fitb_evaluator_rejects_invalid_student_schema(fitb_evaluator):
+    question = _question(
+        question_type="FILL_THE_BLANK",
+        student_answer={"studentAnswer": ["typing"]},
+        expected_answer=_fitb_solution({0: ["typing"]}).model_dump(),
+        question_data=_fitb_question_data(
+            blank_count=1,
+            evaluation_type=BlankEvaluationType.NORMAL,
+            blank_weights={0: 1.0},
+        ).model_dump(),
+        total_score=1.0,
+    )
+
+    with pytest.raises(Exception):
+        fitb_evaluator.evaluate(question, _context())
 
 
 def test_true_false_evaluator_boolean_inputs(true_false_evaluator):

@@ -62,6 +62,7 @@ def _map_response_to_student_payload(
             question_type=question.type,
             student_answer=student_ans,
             expected_answer=expected_ans,
+            question_data=question.questionData.data,
             grading_guidelines=None,  # TODO: Extract if available in questionData
             total_score=question.marks,
             quiz_settings=quiz_settings,

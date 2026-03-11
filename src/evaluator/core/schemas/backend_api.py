@@ -41,7 +41,7 @@ class QuestionEvaluationStatus(str, Enum):
 class BlankEvaluationType(str, Enum):
     STRICT = "STRICT"
     NORMAL = "NORMAL"
-    LENIENT = "LENIENT"
+    HYBRID = "HYBRID"
 
 
 class BlankAnswerType(str, Enum):

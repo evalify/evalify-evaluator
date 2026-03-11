@@ -12,7 +12,7 @@ Starts a worker for processing MCQ (Multiple Choice Question) evaluations.
 - **Queue**: `mcq-queue`
 - **Pool**: `prefork` (CPU-bound processing)
 - **Concurrency**: 4 workers
-- **Use case**: MCQ, FITB (Fill in the Blank), MATCH questions
+- **Use case**: MCQ & MMCQ, FILL_IN_BLANK (Fill in the Blank), MATCH questions
 
 ```bash
 ./scripts/start_mcq_worker.sh
@@ -124,12 +124,14 @@ The system maps question types to queues as configured in `src/evaluator/config.
 
 ```python
 question_type_to_queue = {
-    "MCQ": "mcq-queue",
-    "FITB": "mcq-queue",
-    "MATCH": "mcq-queue",
-    "DESCRIPTIVE": "desc-queue",
-    "CODING": "coding-queue",
-}
+        "MCQ": "mcq-queue",
+        "MMCQ": "mcq-queue", # MCQs with multiple correct options
+        "FILL_THE_BLANK": "mcq-queue",
+        "MATCHING": "mcq-queue",
+        "TRUE_FALSE": "mcq-queue",
+        "DESCRIPTIVE": "desc-queue",
+        "CODING": "coding-queue",
+    }
 ```
 
 ## Logs and PID Files

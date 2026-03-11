@@ -25,6 +25,10 @@ class QuestionPayload(BaseModel):
     expected_answer: Any = Field(
         ..., description="The correct or expected answer/rubric for this question."
     )
+    question_data: Optional[Any] = Field(
+        default=None,
+        description="Question-type-specific metadata needed during evaluation.",
+    )
     grading_guidelines: Optional[str] = Field(
         None, description="Specific guidelines or rubrics for Descriptive evaluation."
     )

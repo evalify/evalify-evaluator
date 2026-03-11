@@ -28,6 +28,24 @@ This document summarizes the **strict** request shapes expected by each evaluato
 - **Failure modes**:
   - Missing `studentAnswer`, non-list payloads, or malformed expected answers ⇒ `EvaluationFailedException`.
 
+## Fill in the Blank Evaluator
+- **Student answer schema**: `FillBlankStudentAnswer`
+  - Shape: `{ "studentAnswer": { "0": "typing", "1": "function", ... } }`
+  - Integer keys are also accepted once the payload is parsed.
+- **Question metadata schema**: `FillBlankQuestionData`
+  - Required because the evaluator uses `config.evaluationType` and `config.blankWeights`.
+- **Expected answer schema**: `FillBlankSolution`
+  - Shape: `{ "acceptableAnswers": { "0": { "answers": ["typing"], "type": "TEXT" }, ... } }`
+- **Scoring**:
+  - `STRICT`: removes whitespace and compares case-sensitively.
+  - `NORMAL`: removes whitespace and compares case-insensitively.
+  - `HYBRID`: not implemented yet and raises `EvaluationFailedException`.
+  - Each blank is scored independently for partial marking.
+  - If `blankWeights` is configured, matching blanks earn those exact weights.
+  - If `blankWeights` is omitted, total marks are split equally across the blanks in the solution.
+- **Failure modes**:
+  - Missing/malformed `question_data`, malformed `studentAnswer`, malformed `acceptableAnswers`, or unsupported evaluation type ⇒ `EvaluationFailedException`.
+
 ## True/False Evaluator
 - **Student answer schema**: `TrueFalseStudentAnswer`
   - Shape: `{ "studentAnswer": true | false | "true" | "false" }`
