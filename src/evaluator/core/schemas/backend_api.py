@@ -29,6 +29,15 @@ class EvaluationStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class QuestionEvaluationStatus(str, Enum):
+    """Question-level evaluation status produced by the evaluator pipeline."""
+
+    EVALUATED = "EVALUATED"
+    ERROR = "ERROR"
+    MANUALLY_EVALUATED = "MANUALLY_EVALUATED"
+    UNEVALUATED = "UNEVALUATED"
+
+
 class BlankEvaluationType(str, Enum):
     STRICT = "STRICT"
     NORMAL = "NORMAL"
@@ -415,3 +424,23 @@ class QuizStudentResponse(BaseModel):
 
 class QuizResponsesResponse(BaseModel):
     responses: List[QuizResponseRecord]
+
+
+class StudentQuestionEvaluationData(BaseModel):
+    """Persisted per-question evaluation payload sent back to Evalify backend."""
+
+    evaluation_status: QuestionEvaluationStatus
+    question_type: str
+    score: float
+    remarks: str
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+    error_message: Optional[str] = None
+    coding: Optional[Dict[str, Any]] = None
+    evaluation_id: Optional[str] = None #TODO: Add a question level evaluation id
+
+
+class StudentEvaluationSavePayload(BaseModel):
+    """Versioned student evaluation payload expected by the save endpoint."""
+
+    data: Dict[str, StudentQuestionEvaluationData]
+    v: int = 1

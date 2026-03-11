@@ -15,6 +15,7 @@ from ...core.schemas.api import (
     EvaluationAcceptedResponse,
     EvaluationProgressResponse,
 )
+from ...worker.tasks.quiz import enqueue_quiz_job
 
 from ...celery_app import app as celery_app
 from ...worker.utils.progress import EvaluationProgressStore
@@ -103,10 +104,9 @@ async def start_evaluation(
         # Dispatch the quiz_job task to Celery
         # Using evaluation_id as task_id makes it easy to track results
         # Send to desc-queue since quiz_job is orchestration work (I/O-bound)
-        celery_app.send_task(
-            "evaluator.worker.tasks.quiz.quiz_job",
-            args=[evaluation_id, request.model_dump()],
-            task_id=evaluation_id,
+        enqueue_quiz_job(
+            evaluation_id=evaluation_id,
+            request=request,
             # TODO: Consider a separate queue for evaluation
             # orchestration vs student evaluation tasks to better manage worker resources
             queue="desc-queue",

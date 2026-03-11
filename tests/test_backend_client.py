@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import json
+from pathlib import Path
 from typing import cast
 
 import httpx
 import pytest
 
 from evaluator.clients.backend_client import BackendAPIError, BackendEvaluationAPIClient
-from evaluator.core.schemas.backend_api import MCQQuestionData
+from evaluator.core.schemas.backend_api import (
+    MCQQuestionData,
+    StudentEvaluationSavePayload,
+    StudentQuestionEvaluationData,
+)
+from evaluator.core.schemas.tasks import QuestionEvaluationStatus
 
 QUIZ_RESPONSE = {
     "quiz": {
@@ -164,3 +171,30 @@ def test_error_response_raises_backend_api_error():
         assert excinfo.value.payload["error"] == "Failed"
         assert route_map.last_request is not None
         assert route_map.last_request.headers.get("API_KEY") == "test-key"
+
+
+def test_save_student_result_serializes_typed_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = StudentEvaluationSavePayload(
+        data={
+            "question-1": StudentQuestionEvaluationData(
+                evaluation_status=QuestionEvaluationStatus.EVALUATED,
+                question_type="MCQ",
+                score=2.0,
+                remarks="Correct answer.",
+                metrics={"time_taken": 0.01},
+                error_message=None,
+                coding=None,
+            )
+        }
+    )
+
+    monkeypatch.chdir(tmp_path)
+
+    with create_mock_backend_client(MockHTTPTransport()) as client:
+        client.save_student_result("quiz-123", "student-99", payload)
+
+    output_file = tmp_path / "tmp_results" / "quiz-123_student-99_result.json"
+    assert output_file.exists()
+    assert json.loads(output_file.read_text()) == payload.model_dump(mode="json")

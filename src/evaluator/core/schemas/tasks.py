@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
 
-from .backend_api import QuizSettings
+from .backend_api import QuestionEvaluationStatus, QuizSettings
 import uuid
 
 # ==============================================================================
@@ -82,9 +82,10 @@ class QuestionEvaluationResult(BaseModel):
 
     # Job stuff
     job_id: uuid.UUID
-    status: str  # "success" or "failed"
+    evaluation_status: QuestionEvaluationStatus
     error: Optional[str] = None
     metrics: Optional[EvaluationMetrics] = None
+    traceback: Optional[str] = None
 
 
 class StudentEvaluationResult(BaseModel):

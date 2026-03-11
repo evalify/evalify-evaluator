@@ -2,13 +2,17 @@
 
 import time
 import uuid
+from typing import Any
 
 from ...celery_app import app as current_app
+from celery.canvas import Signature
+from celery.result import AsyncResult
 from celery.utils.log import get_task_logger
 
 from ...core.schemas import (
     TaskPayload,
     QuestionEvaluationResult,
+    QuestionEvaluationStatus,
     EvaluationMetrics,
     EvaluatorResult,
     EvaluatorContext,
@@ -18,8 +22,38 @@ from ..evaluators.base import EvaluationFailedException
 
 logger = get_task_logger(__name__)
 
+PROCESS_QUESTION_TASK_NAME = "evaluator.worker.tasks.question.process_question_task"
+
+
+def create_process_question_task_signature(
+    task_payload: TaskPayload,
+    *,
+    queue: str,
+) -> Signature:
+    """Build a routed Celery signature for a single question evaluation task."""
+
+    return process_question_task.s(task_payload.model_dump(mode="json")).set(
+        queue=queue
+    )  # pyright: ignore[reportFunctionMemberAccess]
+
+
+def enqueue_process_question_task(
+    task_payload: TaskPayload,
+    *,
+    queue: str,
+    **apply_async_kwargs: Any,
+) -> AsyncResult:
+    """Enqueue a single question evaluation task using typed payload input."""
+
+    return process_question_task.apply_async(  # pyright: ignore[reportFunctionMemberAccess]
+        args=[task_payload.model_dump(mode="json")],
+        queue=queue,
+        **apply_async_kwargs,
+    )
+
 
 @current_app.task(
+    name=PROCESS_QUESTION_TASK_NAME,
     bind=True,
     autoretry_for=(Exception,),  # TODO: Set expected Exception types here
     retry_kwargs={"max_retries": 3, "countdown": 5},
@@ -51,7 +85,7 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
         result: EvaluatorResult = evaluator.evaluate(
             task_payload.question_data, context
         )
-        time_taken = time.monotonic() - _start
+        time_taken = round(time.monotonic() - _start, 3)
 
         # Step 3: Package the successful result
         result_payload = QuestionEvaluationResult(
@@ -60,11 +94,11 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
             student_id=task_payload.student_id,
             question_id=task_payload.question_data.question_id,
             question_type=question_type,
-            status="success",
+            evaluation_status=QuestionEvaluationStatus.EVALUATED,
             evaluated_result=result,
             metrics=EvaluationMetrics(time_taken=time_taken),
         )
-        return result_payload.model_dump()
+        return result_payload.model_dump(mode="json")
 
     except EvaluationFailedException as e:
         # Step 4: Handle a predictable business logic failure.
@@ -76,11 +110,11 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
             question_id=task_payload.question_data.question_id,
             question_type=question_type,
             job_id=uuid.UUID(self.request.id),
-            status="failed",
+            evaluation_status=QuestionEvaluationStatus.ERROR,
             evaluated_result=None,
             error=str(e),
         )
-        return result_payload.model_dump()
+        return result_payload.model_dump(mode="json")
 
     except NotImplementedError as e:
         # Step 5: Handle missing evaluators gracefully
@@ -91,11 +125,11 @@ def process_question_task(self, task_payload_dict: dict) -> dict:
             question_id=task_payload.question_data.question_id,
             question_type=question_type,
             job_id=uuid.UUID(self.request.id),
-            status="not_implemented",
+            evaluation_status=QuestionEvaluationStatus.ERROR,
             evaluated_result=None,
             error=str(e),
         )
-        return result_payload.model_dump()
+        return result_payload.model_dump(mode="json")
 
     except Exception:
         # Step 5: An unexpected system error occurred (e.g., Redis down, bug in code).

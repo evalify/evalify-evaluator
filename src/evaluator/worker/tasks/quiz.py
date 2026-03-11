@@ -1,7 +1,9 @@
 """Quiz Level Tasks for Evaluation"""
 
-from typing import Any, List
+from typing import List
 from celery import group
+from celery.result import AsyncResult
+from celery.canvas import Signature
 from celery.utils.log import get_task_logger
 
 from ...celery_app import app as current_app
@@ -14,12 +16,29 @@ from ...core.schemas.backend_api import (
 )
 from ...clients.backend_client import BackendEvaluationAPIClient
 from ..utils.progress import EvaluationProgressStore
-from .student import student_job
+from .student import create_student_job_signature
 
 logger = get_task_logger(__name__)
 
+QUIZ_JOB_TASK_NAME = "evaluator.worker.tasks.quiz.quiz_job"
+
 
 progress_store = EvaluationProgressStore(current_app)
+
+
+def enqueue_quiz_job(
+    evaluation_id: str,
+    request: EvaluationJobRequest,
+    *,
+    queue: str = "desc-queue",
+) -> AsyncResult:
+    """Enqueue the quiz orchestration task using typed request input."""
+
+    return quiz_job.apply_async(  # pyright: ignore[reportFunctionMemberAccess]
+        args=[evaluation_id, request.model_dump(mode="json")],
+        task_id=evaluation_id,
+        queue=queue,
+    )
 
 
 def _map_response_to_student_payload(
@@ -55,7 +74,7 @@ def _map_response_to_student_payload(
     )
 
 
-@current_app.task(bind=True, queue="desc-queue")
+@current_app.task(name=QUIZ_JOB_TASK_NAME, bind=True, queue="desc-queue")
 def quiz_job(self, evaluation_id: str, request_dict: dict):
     """
     Orchestrates per-student evaluation tasks for a quiz and dispatches them as a Celery group.
@@ -104,7 +123,7 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
             return None
 
         # Create one student_job for each student
-        sub_tasks = []
+        sub_tasks: list[Signature] = []
         for response in student_responses:
             # Map to StudentPayload
             student_payload = _map_response_to_student_payload(
@@ -113,14 +132,16 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
 
             # Create task signature
             sub_tasks.append(
-                student_job.s(
-                    evaluation_id, request.quiz_id, student_payload.model_dump()
-                )  # pyright: ignore[reportFunctionMemberAccess]
+                create_student_job_signature(
+                    evaluation_id=evaluation_id,
+                    quiz_id=request.quiz_id,
+                    student_payload=student_payload,
+                )
             )
 
         # This creates a 'group of groups'
         # The result of this can be tracked to know when the entire quiz is done.
-        quiz_group_job = group(sub_tasks).delay()
+        quiz_group_job = group(sub_tasks).apply_async()
 
         if quiz_group_job is None:
             raise RuntimeError(

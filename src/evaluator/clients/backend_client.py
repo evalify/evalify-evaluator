@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Union
-from pathlib import Path
-import json
-import os
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -14,6 +11,7 @@ from ..core.schemas.backend_api import (
     QuizQuestionsResponse,
     QuizResponsesResponse,
     QuizSettings,
+    StudentEvaluationSavePayload,
     QuizStudentResponse,
 )
 
@@ -92,10 +90,12 @@ class BackendEvaluationAPIClient:
         if self._owns_client:
             self._client.close()
 
-    def _request(self, method: str, url: str) -> httpx.Response:
+    def _request(
+        self, method: str, url: str, *, json: Optional[Any] = None
+    ) -> httpx.Response:
         headers = {"API_KEY": self._api_key}
         try:
-            response = self._client.request(method, url, headers=headers)
+            response = self._client.request(method, url, headers=headers, json=json)
         except httpx.HTTPError as exc:  # pragma: no cover - network failure
             raise BackendAPIError(
                 "Failed to reach Evalify backend", payload={"reason": str(exc)}
@@ -215,49 +215,36 @@ class BackendEvaluationAPIClient:
         response = self._request("GET", f"/eval/quiz/{quiz_id}/student")
         return QuizResponsesResponse.model_validate(response.json())
 
-    # ------------------------------------------------------------------
-    # Stub save endpoint (local file persistence)
-    # ------------------------------------------------------------------
     def save_student_result(
         self,
         quiz_id: str,
         student_id: str,
-        result: dict,
-        *,
-        output_dir: Optional[Union[str, Path]] = None,
-    ) -> Path:
-        """
-        Stub implementation of a student result save endpoint.
-
-        Writes the provided result to a JSON file on disk. This is a placeholder
-        until the real Evalify backend endpoint is available.
+        result: StudentEvaluationSavePayload,
+    ) -> None:
+        """POST the evaluated result for a single student to the backend.
 
         Args:
             quiz_id: Quiz identifier.
             student_id: Student identifier.
-            result: Arbitrary result payload to persist.
-            output_dir: Optional directory to write into (default: ./tmp_results).
+            result: Evaluation payload to persist.
 
-        Returns:
-            Path to the saved JSON file.
+        Raises:
+            BackendAPIError: If the backend returns an error response.
         """
+        self._request(
+            "POST",
+            f"/eval/quiz/{quiz_id}/save/{student_id}",
+            json=result.model_dump(mode="json"),
+        )
+        # Write to a local file instead of making an actual API call for testing purposes
+        # import json
+        # from pathlib import Path
 
-        base_dir = Path(output_dir) if output_dir else Path.cwd() / "tmp_results"
-        base_dir.mkdir(parents=True, exist_ok=True)
-
-        filename = f"student_result_{quiz_id}_{student_id}.json"
-        file_path = base_dir / filename
-
-        # Write atomically: temp file then rename
-        tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
-        with tmp_path.open("w", encoding="utf-8") as f:
-            json.dump(result, f, indent=2, ensure_ascii=False, default=str)
-            f.flush()
-            os.fsync(f.fileno())
-
-        tmp_path.replace(file_path)
-
-        return file_path
+        # output_dir = Path("tmp_results")
+        # output_dir.mkdir(exist_ok=True)
+        # output_file = output_dir / f"{quiz_id}_{student_id}_result.json"
+        # with output_file.open("w") as f:
+        #     json.dump(result.model_dump(mode="json"), f, indent=4)
 
 
 if __name__ == "__main__":

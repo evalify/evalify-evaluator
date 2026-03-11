@@ -1,19 +1,115 @@
 """Student Level Job for Evaluation"""
 
+import uuid
+from typing import Any
+
 from ...celery_app import app as current_app
 from celery import group
+from celery.canvas import Signature
+from celery.result import AsyncResult
 from celery.utils.log import get_task_logger
 
-from ...core.schemas import StudentPayload
+from ...core.schemas import (
+    QuestionEvaluationResult,
+    QuestionEvaluationStatus,
+    QuestionPayload,
+    StudentEvaluationSavePayload,
+    StudentPayload,
+    StudentQuestionEvaluationData,
+    TaskPayload,
+)
 from ...config import settings
 from ...clients.backend_client import BackendEvaluationAPIClient
-from .question import process_question_task
+from .question import create_process_question_task_signature
 
 logger = get_task_logger(__name__)
 
+STUDENT_JOB_TASK_NAME = "evaluator.worker.tasks.student.student_job"
+
+
+def create_student_job_signature(
+    evaluation_id: str,
+    quiz_id: str,
+    student_payload: StudentPayload,
+    *,
+    queue: str = "desc-queue",
+) -> Signature:
+    """Build a routed Celery signature for a single student evaluation job."""
+
+    return student_job.s(
+        evaluation_id,
+        quiz_id,
+        student_payload.model_dump(mode="json"),
+    ).set(queue=queue)  # pyright: ignore[reportFunctionMemberAccess]
+
+
+def enqueue_student_job(
+    evaluation_id: str,
+    quiz_id: str,
+    student_payload: StudentPayload,
+    *,
+    queue: str = "desc-queue",
+    **apply_async_kwargs: Any,
+) -> AsyncResult:
+    """Enqueue a single student evaluation job using typed payload input."""
+
+    return student_job.apply_async(  # pyright: ignore[reportFunctionMemberAccess]
+        args=[evaluation_id, quiz_id, student_payload.model_dump(mode="json")],
+        queue=queue,
+        **apply_async_kwargs,
+    )
+
+
+def _coerce_question_result(
+    quiz_id: str,
+    student_id: str,
+    question_data: QuestionPayload,
+    task_result,
+) -> QuestionEvaluationResult:
+    if task_result.failed():
+        return QuestionEvaluationResult(
+            quiz_id=quiz_id,
+            student_id=student_id,
+            question_id=question_data.question_id,
+            question_type=question_data.question_type,
+            job_id=uuid.UUID(str(task_result.id)),
+            evaluation_status=QuestionEvaluationStatus.ERROR,
+            evaluated_result=None,
+            error=str(task_result.result),
+            traceback=task_result.traceback,
+        )
+
+    return QuestionEvaluationResult.model_validate(task_result.result)
+
+
+def _build_student_question_evaluation_data(
+    result: QuestionEvaluationResult,
+) -> StudentQuestionEvaluationData:
+    evaluated = result.evaluated_result
+
+    if (
+        result.evaluation_status == QuestionEvaluationStatus.EVALUATED
+        and evaluated is not None
+    ):
+        score = evaluated.score
+        remarks = evaluated.feedback or ""
+    else:
+        score = 0
+        remarks = (evaluated.feedback if evaluated else "") or ""
+
+    return StudentQuestionEvaluationData(
+        evaluation_status=result.evaluation_status,
+        question_type=result.question_type,
+        score=score,
+        remarks=remarks,
+        metrics=result.metrics.model_dump(mode="json") if result.metrics else {},
+        error_message=result.error,
+        coding=None,
+    )
+
 
 @current_app.task(
-    bind=True, queue="desc-queue"
+    name=STUDENT_JOB_TASK_NAME, bind=True, queue="desc-queue"
 )  # An I/O-bound queue is fine for orchestration
 def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: dict):
     """
@@ -29,10 +125,17 @@ def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: di
     )
 
     sub_tasks = []
+    queued_questions: list[QuestionPayload] = []
     for question_data in student_payload.questions:
         # Step 1: Look up the correct queue from our central config
         queue_name = settings.question_type_to_queue.get(question_data.question_type)
         if not queue_name:
+            if question_data.question_type == "FILE_UPLOAD":
+                logger.warning(
+                    f"Question type {question_data.question_type} is not supported for evaluation. Skipping question_id={question_data.question_id} for student_id={student_id}"
+                )
+                continue  # Skip unsupported question types without failing the entire student job
+
             logger.error(
                 f"No queue configured for question type: {question_data.question_type}"
             )
@@ -40,15 +143,19 @@ def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: di
             continue
 
         # Step 2: Create the task payload for the generic question worker
-        task_payload = {
-            "quiz_id": quiz_id,
-            "student_id": student_id,
-            "question_data": question_data.model_dump(),
-        }
+        task_payload = TaskPayload(
+            quiz_id=quiz_id,
+            student_id=student_id,
+            question_data=question_data,
+        )
 
         # Step 3: Create a Celery signature and set its queue dynamically
-        task_signature = process_question_task.s(task_payload).set(queue=queue_name)  # pyright: ignore[reportFunctionMemberAccess]
+        task_signature = create_process_question_task_signature(
+            task_payload,
+            queue=queue_name,
+        )
         sub_tasks.append(task_signature)
+        queued_questions.append(question_data)
 
     if not sub_tasks:
         logger.warning(f"No valid tasks to process for student_id={student_id}")
@@ -61,61 +168,24 @@ def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: di
     )  # Wait for all, do not fail this task if a sub-task fails
 
     # Step 5: Aggregate the results, adding metadata
-    aggregated_results = []
-    for i, r in enumerate(group_job.results):
-        if r.failed():
-            # This indicates a SYSTEM failure (the task itself failed in Celery)
-            aggregated_results.append(
-                {
-                    "job_id": r.id,  # Celery task id for the failed subtask
-                    "status": "system_error",
-                    "error": str(r.result),
-                    "traceback": r.traceback,
-                }
+    aggregated_results: list[QuestionEvaluationResult] = []
+    for question_data, task_result in zip(queued_questions, group_job.results):
+        aggregated_results.append(
+            _coerce_question_result(
+                quiz_id=quiz_id,
+                student_id=student_id,
+                question_data=question_data,
+                task_result=task_result,
             )
-        else:
-            # This is a successful task execution, which could contain a business logic failure
-            aggregated_results.append(
-                r.result
-            )  # r.result is the dict returned by process_question_task
+        )
 
     # Build student-level save payload with required schema
-    data_map = {}
-    for res in aggregated_results:
-        question_id = res.get("question_id") if isinstance(res, dict) else None
-        if not question_id:
-            continue
-
-        status = res.get("status", "UNEVALUATED")
-        evaluated = res.get("evaluated_result") if isinstance(res, dict) else None
-        error_msg = res.get("error") if isinstance(res, dict) else None
-
-        if status == "success" and evaluated:
-            mark = evaluated.get("score", 0)
-            remarks = evaluated.get("feedback", "") or ""
-        else:
-            mark = 0
-            remarks = (
-                error_msg or (evaluated.get("feedback") if evaluated else "") or ""
-            )
-
-        data_map[question_id] = {
-            "evaluation_status": status.upper()
-            if isinstance(status, str)
-            else "UNEVALUATED",
-            "question_type": res.get("question_type", "")
-            if isinstance(res, dict)
-            else "",
-            "score": mark,
-            "remarks": remarks,
-            "metrics": res.get("metrics", {}) if isinstance(res, dict) else {},
-            "error_message": error_msg or None,
-        }
-
-    student_save_payload = {
-        "data": data_map,
-        "v": "v1",
+    data_map = {
+        result.question_id: _build_student_question_evaluation_data(result)
+        for result in aggregated_results
     }
+
+    student_save_payload = StudentEvaluationSavePayload(data=data_map)
 
     # Step 6: Persist student-level result via backend save endpoint
     try:
@@ -136,5 +206,5 @@ def student_job(self, evaluation_id: str, quiz_id: str, student_payload_dict: di
     # Step 7: Return the aggregated payload
     return {
         "student_id": student_id,
-        "results": aggregated_results,
+        "results": [result.model_dump(mode="json") for result in aggregated_results],
     }
