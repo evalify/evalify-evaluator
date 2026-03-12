@@ -10,6 +10,7 @@ import, we eagerly import the concrete evaluator modules here.
 from . import mcq_evaluator  # noqa: F401  (imported for side effects)
 from . import mmcq_evaluator  # noqa: F401  (imported for side effects)
 from . import fitb_evaluator  # noqa: F401  (imported for side effects)
+from . import coding_evaluator  # noqa: F401  (imported for side effects)
 from . import match_evaluator  # noqa: F401  (imported for side effects)
 from . import true_false_evaluator  # noqa: F401  (imported for side effects)
 from . import stub_sleep_evaluator  # noqa: F401  (imported for side effects)

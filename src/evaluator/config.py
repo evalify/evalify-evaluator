@@ -33,11 +33,16 @@ class Settings(BaseSettings):
         description="API key required by the Evalify backend /api/eval endpoints",
     )
 
+    judge_api: str = Field(
+        default="http://localhost:2358",
+        description="Base URL or host:port for the Judge0 API service",
+    )
+
     # ===== QUEUE MAPPING SETTINGS =====
     # TODO: Should I put this in CelerySettings, instead?
     question_type_to_queue: Dict[str, str] = {
         "MCQ": "mcq-queue",
-        "MMCQ": "mcq-queue", # MCQs with multiple correct options
+        "MMCQ": "mcq-queue",  # MCQs with multiple correct options
         "FILL_THE_BLANK": "mcq-queue",
         "MATCHING": "mcq-queue",
         "TRUE_FALSE": "mcq-queue",

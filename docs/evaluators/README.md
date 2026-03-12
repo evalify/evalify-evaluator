@@ -46,6 +46,28 @@ This document summarizes the **strict** request shapes expected by each evaluato
 - **Failure modes**:
   - Missing/malformed `question_data`, malformed `studentAnswer`, malformed `acceptableAnswers`, or unsupported evaluation type ⇒ `EvaluationFailedException`.
 
+## Coding Evaluator
+- **Student answer schema**: `CodingStudentAnswer`
+  - Preferred shape: `{ "studentAnswer": { "language": "PYTHON", "code": "def solve(): ..." } }`
+  - Legacy tolerated: `{ "studentAnswer": "print('hello')" }` when exactly one language is configured.
+- **Question metadata schema**: `CodingQuestionData`
+  - Uses `config.languages`, `config.timeLimitMs`, `config.memoryLimitMb`, and `testCases`.
+  - Legacy single-language coding configs are also tolerated.
+- **Expected answer schema**: `CodingSolution`
+  - Uses per-language `referenceSolution` entries and expected outputs per test case.
+  - Legacy top-level `referenceSolution` is also tolerated for single-language questions.
+- **Execution**:
+  - Student code and reference solution are both executed in Judge0 using the selected language.
+  - Final source is assembled as `boilerplateCode + student/reference solution + driverCode` when those parts are present.
+  - A test case passes when the normalized stdout of the student submission matches the normalized stdout of the reference solution.
+  - The reference solution's output must also match the stored `expectedOutput`; otherwise evaluation fails fast.
+- **Scoring**:
+  - If `marksWeightage` is present for test cases, passed cases earn those exact weights.
+  - Otherwise, total marks are split equally across test cases.
+  - Partial scoring is therefore naturally supported at the test-case level.
+- **Failure modes**:
+  - Missing language selection for multi-language questions, missing reference solution, Judge0 execution failure, malformed coding payloads, or missing expected outputs ⇒ `EvaluationFailedException`.
+
 ## True/False Evaluator
 - **Student answer schema**: `TrueFalseStudentAnswer`
   - Shape: `{ "studentAnswer": true | false | "true" | "false" }`

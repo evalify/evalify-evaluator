@@ -146,10 +146,22 @@ class DescriptiveSolution(BaseModel):
     keywords: Optional[List[str]] = None
 
 
-class CodingConfig(BaseModel):
+class CodingLanguageConfig(BaseModel):
     language: CodingLanguage
+    boilerplateCode: Optional[str] = None
+    driverCode: Optional[str] = None
+    lockedLines: Optional[List[int]] = None
+    allowNewLines: Optional[bool] = None
+
+
+class CodingConfig(BaseModel):
+    languages: Optional[List[CodingLanguageConfig]] = None
+    language: Optional[CodingLanguage] = None
     templateCode: Optional[str] = None
     boilerplateCode: Optional[str] = None
+    driverCode: Optional[str] = None
+    lockedLines: Optional[List[int]] = None
+    allowNewLines: Optional[bool] = None
     timeLimitMs: Optional[int] = None
     memoryLimitMb: Optional[int] = None
 
@@ -172,7 +184,13 @@ class CodingSolutionTestCase(BaseModel):
     expectedOutput: str
 
 
+class CodingSolutionLanguage(BaseModel):
+    language: CodingLanguage
+    referenceSolution: str
+
+
 class CodingSolution(BaseModel):
+    languages: Optional[List[CodingSolutionLanguage]] = None
     referenceSolution: Optional[str] = None
     testCases: List[CodingSolutionTestCase]
 
@@ -257,8 +275,13 @@ class FillBlankStudentAnswer(BaseStudentAnswer):
     studentAnswer: Dict[int, str]  # Map of blank index to answer text
 
 
+class CodingStudentSubmission(BaseModel):
+    language: Optional[CodingLanguage] = None
+    code: str
+
+
 class CodingStudentAnswer(BaseStudentAnswer):
-    studentAnswer: str  # The code submitted
+    studentAnswer: Union[str, CodingStudentSubmission, Dict[str, Any]]
 
 
 class FileUploadStudentAnswer(BaseStudentAnswer):
@@ -436,7 +459,7 @@ class StudentQuestionEvaluationData(BaseModel):
     metrics: Dict[str, Any] = Field(default_factory=dict)
     error_message: Optional[str] = None
     coding: Optional[Dict[str, Any]] = None
-    evaluation_id: Optional[str] = None #TODO: Add a question level evaluation id
+    evaluation_id: Optional[str] = None  # TODO: Add a question level evaluation id
 
 
 class StudentEvaluationSavePayload(BaseModel):

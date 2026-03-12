@@ -6,12 +6,23 @@ from copy import deepcopy
 
 import pytest
 
+from evaluator.clients.judge0_client import Judge0SubmissionResult
+from evaluator.worker.evaluators.coding_evaluator import CodingEvaluator
 from evaluator.worker.evaluators.factory import EvaluatorFactory
 from evaluator.core.schemas import QuestionPayload, EvaluatorContext
 from evaluator.core.schemas.backend_api import (
     BlankAcceptableAnswer,
     BlankAnswerType,
     BlankEvaluationType,
+    CodingConfig,
+    CodingLanguage,
+    CodingLanguageConfig,
+    CodingQuestionData,
+    CodingSolution,
+    CodingSolutionLanguage,
+    CodingStudentAnswer,
+    CodingTestCase,
+    CodingSolutionTestCase,
     FillBlankConfig,
     FillBlankQuestionData,
     FillBlankSolution,
@@ -93,6 +104,43 @@ def fitb_evaluator():
     return EvaluatorFactory.get_evaluator("FILL_THE_BLANK")
 
 
+class FakeJudge0Client:
+    def __init__(self, outputs: dict[tuple[str, str], str]):
+        self.outputs = outputs
+
+    def close(self) -> None:
+        return None
+
+    def run_code(
+        self,
+        *,
+        source_code: str,
+        language: CodingLanguage | None = None,
+        language_id: int | None = None,
+        stdin: str = "",
+        cpu_time_limit_seconds=None,
+        memory_limit_kb=None,
+    ) -> Judge0SubmissionResult:
+        del language, language_id, cpu_time_limit_seconds, memory_limit_kb
+        output = self.outputs.get((source_code, stdin))
+        if output is None:
+            return Judge0SubmissionResult(
+                stdout=None,
+                stderr="runtime error",
+                compile_output=None,
+                message=None,
+                status={"id": 11, "description": "Runtime Error"},
+            )
+
+        return Judge0SubmissionResult(
+            stdout=output,
+            stderr=None,
+            compile_output=None,
+            message=None,
+            status={"id": 3, "description": "Accepted"},
+        )
+
+
 def _fitb_question_data(
     *,
     blank_count: int,
@@ -118,6 +166,31 @@ def _fitb_solution(acceptable_answers: dict[int, list[str]]) -> FillBlankSolutio
             for blank_index, answers in acceptable_answers.items()
         }
     )
+
+
+def _coding_question_data(
+    *,
+    languages: list[CodingLanguageConfig],
+    testcases: list[CodingTestCase],
+    time_limit_ms: int | None = None,
+    memory_limit_mb: int | None = None,
+) -> CodingQuestionData:
+    return CodingQuestionData(
+        config=CodingConfig(
+            languages=languages,
+            timeLimitMs=time_limit_ms,
+            memoryLimitMb=memory_limit_mb,
+        ),
+        testCases=testcases,
+    )
+
+
+def _coding_solution(
+    *,
+    languages: list[CodingSolutionLanguage],
+    testcases: list[CodingSolutionTestCase],
+) -> CodingSolution:
+    return CodingSolution(languages=languages, testCases=testcases)
 
 
 def test_mcq_evaluator_accepts_single_string_answer(mcq_evaluator):
@@ -440,6 +513,292 @@ def test_fitb_evaluator_rejects_invalid_student_schema(fitb_evaluator):
 
     with pytest.raises(Exception):
         fitb_evaluator.evaluate(question, _context())
+
+
+def test_coding_evaluator_awards_full_marks_when_all_tests_pass():
+    question_data = _coding_question_data(
+        languages=[
+            CodingLanguageConfig(
+                language=CodingLanguage.PYTHON,
+                boilerplateCode="# boilerplate",
+                driverCode="# driver",
+            )
+        ],
+        testcases=[
+            CodingTestCase(
+                id="tc1",
+                input="1 2",
+                visibility="VISIBLE",
+                marksWeightage=0.4,
+                orderIndex=1,
+            ),
+            CodingTestCase(
+                id="tc2",
+                input="3 4",
+                visibility="HIDDEN",
+                marksWeightage=0.6,
+                orderIndex=2,
+            ),
+        ],
+        time_limit_ms=1000,
+        memory_limit_mb=64,
+    )
+    expected = _coding_solution(
+        languages=[
+            CodingSolutionLanguage(
+                language=CodingLanguage.PYTHON,
+                referenceSolution="REFERENCE_OK",
+            )
+        ],
+        testcases=[
+            CodingSolutionTestCase(id="tc1", expectedOutput="3"),
+            CodingSolutionTestCase(id="tc2", expectedOutput="7"),
+        ],
+    )
+    student_answer = CodingStudentAnswer(
+        studentAnswer={"language": "PYTHON", "code": "STUDENT_OK"}
+    ).model_dump()
+
+    student_source = "# boilerplate\nSTUDENT_OK\n# driver"
+    reference_source = "# boilerplate\nREFERENCE_OK\n# driver"
+    evaluator = CodingEvaluator(
+        judge_client=FakeJudge0Client(
+            {
+                (student_source, "1 2"): "3\n",
+                (student_source, "3 4"): "7\n",
+                (reference_source, "1 2"): "3",
+                (reference_source, "3 4"): "7",
+            }
+        )
+    )
+
+    result = evaluator.evaluate(
+        _question(
+            question_type="CODING",
+            student_answer=student_answer,
+            expected_answer=expected.model_dump(),
+            question_data=question_data.model_dump(),
+            total_score=10.0,
+        ),
+        _context(),
+    )
+
+    assert result.score == pytest.approx(10.0)
+    assert result.feedback == "Passed 2/2 test cases"
+
+
+def test_coding_evaluator_uses_weighted_partial_marks_when_enabled():
+    settings = _quiz_settings().model_copy(update={"codingGlobalPartialMarking": True})
+    question_data = _coding_question_data(
+        languages=[CodingLanguageConfig(language=CodingLanguage.PYTHON)],
+        testcases=[
+            CodingTestCase(
+                id="tc1",
+                input="input-1",
+                visibility="VISIBLE",
+                marksWeightage=2.0,
+                orderIndex=1,
+            ),
+            CodingTestCase(
+                id="tc2",
+                input="input-2",
+                visibility="VISIBLE",
+                marksWeightage=3.0,
+                orderIndex=2,
+            ),
+        ],
+    )
+    expected = _coding_solution(
+        languages=[
+            CodingSolutionLanguage(
+                language=CodingLanguage.PYTHON,
+                referenceSolution="REFERENCE_PARTIAL",
+            )
+        ],
+        testcases=[
+            CodingSolutionTestCase(id="tc1", expectedOutput="ok-1"),
+            CodingSolutionTestCase(id="tc2", expectedOutput="ok-2"),
+        ],
+    )
+    student_source = "STUDENT_PARTIAL"
+    reference_source = "REFERENCE_PARTIAL"
+    evaluator = CodingEvaluator(
+        judge_client=FakeJudge0Client(
+            {
+                (student_source, "input-1"): "ok-1",
+                (student_source, "input-2"): "wrong",
+                (reference_source, "input-1"): "ok-1",
+                (reference_source, "input-2"): "ok-2",
+            }
+        )
+    )
+
+    result = evaluator.evaluate(
+        _question(
+            question_type="CODING",
+            student_answer=CodingStudentAnswer(
+                studentAnswer="STUDENT_PARTIAL"
+            ).model_dump(),
+            expected_answer=expected.model_dump(),
+            question_data=question_data.model_dump(),
+            total_score=5.0,
+            quiz_settings=settings,
+        ),
+        _context(quiz_settings=settings),
+    )
+
+    assert result.score == pytest.approx(2.0)
+    assert result.feedback == "Passed 1/2 test cases"
+
+
+def test_coding_evaluator_returns_zero_without_partial_marking():
+    question_data = _coding_question_data(
+        languages=[CodingLanguageConfig(language=CodingLanguage.PYTHON)],
+        testcases=[
+            CodingTestCase(
+                id="tc1",
+                input="input-1",
+                visibility="VISIBLE",
+                marksWeightage=2.0,
+                orderIndex=1,
+            ),
+            CodingTestCase(
+                id="tc2",
+                input="input-2",
+                visibility="VISIBLE",
+                marksWeightage=3.0,
+                orderIndex=2,
+            ),
+        ],
+    )
+    expected = _coding_solution(
+        languages=[
+            CodingSolutionLanguage(
+                language=CodingLanguage.PYTHON,
+                referenceSolution="REFERENCE_PARTIAL",
+            )
+        ],
+        testcases=[
+            CodingSolutionTestCase(id="tc1", expectedOutput="ok-1"),
+            CodingSolutionTestCase(id="tc2", expectedOutput="ok-2"),
+        ],
+    )
+    evaluator = CodingEvaluator(
+        judge_client=FakeJudge0Client(
+            {
+                ("STUDENT_PARTIAL", "input-1"): "ok-1",
+                ("STUDENT_PARTIAL", "input-2"): "wrong",
+                ("REFERENCE_PARTIAL", "input-1"): "ok-1",
+                ("REFERENCE_PARTIAL", "input-2"): "ok-2",
+            }
+        )
+    )
+
+    result = evaluator.evaluate(
+        _question(
+            question_type="CODING",
+            student_answer=CodingStudentAnswer(
+                studentAnswer="STUDENT_PARTIAL"
+            ).model_dump(),
+            expected_answer=expected.model_dump(),
+            question_data=question_data.model_dump(),
+            total_score=5.0,
+        ),
+        _context(),
+    )
+
+    assert result.score == pytest.approx(0.0)
+    assert result.feedback == "Passed 1/2 test cases"
+
+
+def test_coding_evaluator_requires_language_for_multilang_questions():
+    evaluator = CodingEvaluator(judge_client=FakeJudge0Client({}))
+    question_data = _coding_question_data(
+        languages=[
+            CodingLanguageConfig(language=CodingLanguage.PYTHON),
+            CodingLanguageConfig(language=CodingLanguage.JAVA),
+        ],
+        testcases=[
+            CodingTestCase(
+                id="tc1",
+                input="",
+                visibility="VISIBLE",
+                orderIndex=1,
+            )
+        ],
+    )
+    expected = _coding_solution(
+        languages=[
+            CodingSolutionLanguage(
+                language=CodingLanguage.PYTHON,
+                referenceSolution="print('hi')",
+            ),
+            CodingSolutionLanguage(
+                language=CodingLanguage.JAVA,
+                referenceSolution="class Main {}",
+            ),
+        ],
+        testcases=[CodingSolutionTestCase(id="tc1", expectedOutput="hi")],
+    )
+
+    with pytest.raises(Exception):
+        evaluator.evaluate(
+            _question(
+                question_type="CODING",
+                student_answer=CodingStudentAnswer(
+                    studentAnswer="print('hi')"
+                ).model_dump(),
+                expected_answer=expected.model_dump(),
+                question_data=question_data.model_dump(),
+                total_score=1.0,
+            ),
+            _context(),
+        )
+
+
+def test_coding_evaluator_supports_legacy_single_language_schema():
+    evaluator = CodingEvaluator(
+        judge_client=FakeJudge0Client(
+            {
+                ("legacy student", ""): "42",
+                ("legacy reference", ""): "42",
+            }
+        )
+    )
+
+    result = evaluator.evaluate(
+        _question(
+            question_type="CODING",
+            student_answer=CodingStudentAnswer(
+                studentAnswer="legacy student"
+            ).model_dump(),
+            expected_answer={
+                "referenceSolution": "legacy reference",
+                "testCases": [{"id": "tc1", "expectedOutput": "42"}],
+            },
+            question_data={
+                "config": {
+                    "language": "PYTHON",
+                    "boilerplateCode": None,
+                    "timeLimitMs": 1000,
+                    "memoryLimitMb": 64,
+                },
+                "testCases": [
+                    {
+                        "id": "tc1",
+                        "input": "",
+                        "visibility": "VISIBLE",
+                        "orderIndex": 1,
+                    }
+                ],
+            },
+            total_score=2.0,
+        ),
+        _context(),
+    )
+
+    assert result.score == pytest.approx(2.0)
+    assert result.feedback == "Passed 1/1 test cases"
 
 
 def test_true_false_evaluator_boolean_inputs(true_false_evaluator):
