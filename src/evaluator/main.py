@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
+from .core.middleware import add_api_key_auth_middleware
 from .dependencies import close_redis_client
 from .version import __version__, get_version_info
 from .api.routers import evaluation_router
@@ -33,6 +34,9 @@ app = FastAPI(
     lifespan=lifespan,
     debug=settings.debug_mode,
 )
+
+add_api_key_auth_middleware(app)
+
 
 # Add CORS middleware if origins are configured
 if settings.allowed_origins or settings.environment == "development":

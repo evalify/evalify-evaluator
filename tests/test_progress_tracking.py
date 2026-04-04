@@ -6,6 +6,7 @@ from typing import Any, Dict, Generator, List, Tuple
 import pytest
 from fastapi.testclient import TestClient
 
+from evaluator.config import settings
 from evaluator.main import app
 from evaluator.api.routers import evaluation as evaluation_module
 
@@ -76,7 +77,19 @@ def client() -> Generator[TestClient, None, None]:
         test_client (TestClient): A TestClient instance configured for the application.
     """
     with TestClient(app) as test_client:
+        test_client.headers.update({"API_KEY": settings.evaluation_service_api_key})
         yield test_client
+
+
+def test_progress_requires_api_key_when_missing_header():
+    """Requests without API_KEY should be rejected with 401."""
+    with TestClient(app) as unauthenticated_client:
+        response = unauthenticated_client.get(
+            "/api/v1/evaluations/quiz-running/progress"
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"error": "Unauthorized", "status": 401}
 
 
 def _configure_progress_store(
