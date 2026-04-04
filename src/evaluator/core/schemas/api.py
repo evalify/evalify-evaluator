@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Optional, List
 
 
 # ==============================================================================
@@ -20,8 +21,14 @@ class EvaluationJobRequest(BaseModel):
         False,
         description="If true, forces re-evaluation of submissions that already have a grade.",
     )
-
-    # TODO: Add Filters
+    student_ids: Optional[List[str]] = Field(
+        None,
+        description="Optional list of student IDs to evaluate. If provided, only these students will be evaluated.",
+    )
+    question_ids: Optional[List[str]] = Field(
+        None,
+        description="Optional list of question IDs to evaluate. If provided, only these questions will be evaluated for each student.",
+    )
 
 
 # ==============================================================================

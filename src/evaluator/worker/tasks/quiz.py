@@ -1,6 +1,6 @@
 """Quiz Level Tasks for Evaluation"""
 
-from typing import List
+from typing import List, Optional
 from celery import group
 from celery.result import AsyncResult
 from celery.canvas import Signature
@@ -45,12 +45,25 @@ def _map_response_to_student_payload(
     student_response: QuizResponseRecord,
     questions: List[QuizQuestion],
     quiz_settings: QuizSettings,
+    question_ids_filter: Optional[List[str]] = None,
 ) -> StudentPayload:
-    """Maps a student's quiz response to a StudentPayload for evaluation."""
+    """
+    Maps a student's quiz response to a StudentPayload for evaluation.
+
+    Parameters:
+        student_response: The student's quiz response record.
+        questions: The list of all quiz questions.
+        quiz_settings: The quiz-wide settings.
+        question_ids_filter: Optional list of question IDs to include. If provided, only these questions are mapped.
+    """
     question_payloads = []
     student_answers = student_response.response or {}
 
     for question in questions:
+        # Skip this question if question_ids_filter is provided and doesn't include it
+        if question_ids_filter is not None and question.id not in question_ids_filter:
+            continue
+
         student_ans = student_answers.get(question.id)
 
         # TODO: Raise an error if expected answer is missing
@@ -123,12 +136,26 @@ def quiz_job(self, evaluation_id: str, request_dict: dict):
             progress_store.mark_completed(request.quiz_id)
             return None
 
+        # Filter students if student_ids filter is provided
+        filtered_responses = student_responses
+        if request.student_ids is not None:
+            student_ids_set = set(request.student_ids)
+            filtered_responses = [
+                resp for resp in student_responses if resp.studentId in student_ids_set
+            ]
+            logger.info(
+                f"Filtered to {len(filtered_responses)} students based on student_ids filter for quiz_id={request.quiz_id}"
+            )
+
         # Create one student_job for each student
         sub_tasks: list[Signature] = []
-        for response in student_responses:
+        for response in filtered_responses:
             # Map to StudentPayload
             student_payload = _map_response_to_student_payload(
-                response, questions, quiz_settings
+                response,
+                questions,
+                quiz_settings,
+                question_ids_filter=request.question_ids,
             )
 
             # Create task signature
